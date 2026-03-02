@@ -6,6 +6,15 @@ A collection of web UI components that are **visually indistinguishable from a r
 
 The joke is the contrast: it looks like something you'd find in a real settings panel or a SaaS product, but the interaction mechanic is completely ridiculous.
 
+## Page Context Rule
+
+Each component file is **not just the component** — it's a full fake page that makes the component feel natural and expected. The component is embedded inside a realistic fake web page that gives it context.
+
+- The fake page should look like a real site (video player, settings page, checkout, etc.)
+- The absurd component is triggered the same way the real one would be (click the volume icon → popup)
+- The rest of the page is convincing filler: fake titles, fake content, fake UI chrome
+- A well-placed fake comment or UI hint can quietly acknowledge the absurdity (see: `@just_vibing_here`)
+
 ## Design Philosophy
 
 **Look like real UI.**

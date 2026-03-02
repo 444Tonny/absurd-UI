@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Schedule a Meeting — Planr</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #f3f4f6;
+            font-family: system-ui, sans-serif;
+            font-size: 14px;
+            min-height: 100vh;
+        }
+
+        nav {
+            background: #fff;
+            border-bottom: 1px solid #e5e7eb;
+            height: 52px;
+            display: flex; align-items: center;
+            padding: 0 24px;
+        }
+        .logo { font-weight: 600; font-size: 16px; color: #111827; }
+        .logo span { color: #6366f1; }
+
+        main { max-width: 460px; margin: 40px auto; padding: 0 16px; }
+        .page-title { font-size: 20px; font-weight: 600; color: #111827; margin-bottom: 4px; }
+        .page-sub   { font-size: 13px; color: #6b7280; margin-bottom: 24px; }
+
+        .card {
+            background: #fff; border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.05);
+            padding: 24px;
+        }
+        .field { margin-bottom: 16px; }
+        label { display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 5px; }
+        input[type=text], input[type=email], select, textarea {
+            width: 100%; padding: 9px 12px;
+            border: 1px solid #e5e7eb; border-radius: 8px;
+            font-size: 14px; font-family: system-ui; color: #111827;
+            background: #fff; outline: none; transition: border-color 0.15s;
+        }
+        input:focus, select:focus, textarea:focus { border-color: #6366f1; }
+        textarea { resize: vertical; min-height: 72px; }
+
+        .date-row { display: flex; gap: 8px; align-items: center; }
+        .date-display {
+            flex: 1; padding: 9px 12px;
+            border: 1px solid #e5e7eb; border-radius: 8px;
+            font-size: 14px; color: #9ca3af; user-select: none;
+        }
+        .date-display.set { color: #111827; }
+        .date-btn {
+            background: #6366f1; color: #fff; border: none;
+            padding: 9px 14px; border-radius: 8px;
+            font-size: 13px; font-family: system-ui; font-weight: 500;
+            cursor: pointer; white-space: nowrap; transition: background 0.15s;
+        }
+        .date-btn:hover { background: #4f46e5; }
+
+        .submit-btn {
+            width: 100%; background: #111827; color: #fff; border: none;
+            padding: 11px; border-radius: 8px; margin-top: 6px;
+            font-size: 14px; font-family: system-ui; font-weight: 500;
+            cursor: pointer; transition: background 0.15s;
+        }
+        .submit-btn:hover { background: #1f2937; }
+
+        /* ── Modal ── */
+        .overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.35);
+            display: none; align-items: center; justify-content: center;
+            z-index: 50;
+        }
+        .modal {
+            background: #fff; border-radius: 14px;
+            box-shadow: 0 16px 48px rgba(0,0,0,0.25);
+            padding: 26px 22px 20px;
+            width: 420px;
+        }
+        .modal-title {
+            font-size: 15px; font-weight: 600; color: #111827;
+            text-align: center; margin-bottom: 20px;
+        }
+
+        /* Machine layout: slots + lever side by side */
+        .machine { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
+        .slots-area { display: flex; flex: 1; gap: 6px; }
+
+        /* Slot column */
+        .slot-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+        .slot-col-label { font-size: 10px; color: #9ca3af; letter-spacing: 1px; text-transform: uppercase; }
+
+        /* Slot window */
+        .slot-window {
+            width: 100%; height: 180px;
+            border: 1px solid #e5e7eb; border-radius: 8px;
+            background: #f9fafb;
+            position: relative; overflow: hidden;
+        }
+        /* Gradient masks (top & bottom fade) */
+        .slot-window::before,
+        .slot-window::after {
+            content: ''; position: absolute; left: 0; right: 0; z-index: 2; pointer-events: none;
+        }
+        .slot-window::before { top: 0;    height: 54px; background: linear-gradient(#f9fafb, transparent); }
+        .slot-window::after  { bottom: 0; height: 54px; background: linear-gradient(transparent, #f9fafb); }
+        /* Center highlight band */
+        .slot-center {
+            position: absolute; top: 60px; height: 60px;
+            left: 0; right: 0;
+            border-top: 1px solid #e0e7ff;
+            border-bottom: 1px solid #e0e7ff;
+            background: rgba(99,102,241,0.04);
+            pointer-events: none; z-index: 3;
+        }
+        /* Reel */
+        .reel-inner { position: absolute; top: 0; left: 0; width: 100%; will-change: transform; }
+        .reel-item {
+            height: 60px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 25px; font-weight: 700; color: #111827;
+            letter-spacing: 1px;
+        }
+
+        /* ── Lever ── */
+        .lever-area {
+            display: flex; flex-direction: column;
+            align-items: center; gap: 6px;
+            flex-shrink: 0;
+        }
+        .lever-label { font-size: 9px; letter-spacing: 2px; color: #9ca3af; text-transform: uppercase; }
+        .lever-track {
+            width: 10px; height: 148px;
+            background: #e5e7eb; border-radius: 5px;
+            position: relative;
+            box-shadow: inset 0 2px 6px rgba(0,0,0,0.12);
+        }
+        /* Groove */
+        .lever-track::after {
+            content: ''; position: absolute; top: 0; bottom: 0;
+            left: 50%; transform: translateX(-50%);
+            width: 4px; background: #d1d5db; border-radius: 2px;
+        }
+        .lever-ball {
+            position: absolute; top: 4px; left: 50%;
+            transform: translateX(-50%);
+            width: 32px; height: 32px; border-radius: 50%;
+            background: radial-gradient(circle at 35% 35%, #6b7280, #1f2937);
+            box-shadow: 0 3px 10px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.2);
+            cursor: pointer; z-index: 1;
+        }
+        .lever-ball:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.35); }
+
+        /* Modal buttons */
+        .modal-btns { display: flex; gap: 8px; }
+        .btn {
+            flex: 1; padding: 10px; border-radius: 8px;
+            font-size: 13px; font-family: system-ui; font-weight: 500;
+            cursor: pointer; border: none; transition: all 0.15s;
+        }
+        .btn-secondary { background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb; }
+        .btn-secondary:hover:not(:disabled) { background: #e5e7eb; }
+        .btn-primary   { background: #111827; color: #fff; }
+        .btn-primary:hover:not(:disabled)   { background: #1f2937; }
+        .btn:disabled  { opacity: 0.35; cursor: default; }
+    </style>
+</head>
+<body>
+
+<nav><div class="logo">Plan<span>r</span></div></nav>
+
+<main>
+    <div class="page-title">Schedule a Meeting</div>
+    <div class="page-sub">Fill in the details below and we'll confirm your slot.</div>
+    <div class="card">
+        <div class="field">
+            <label>Full name</label>
+            <input type="text" placeholder="Jane Smith">
+        </div>
+        <div class="field">
+            <label>Email</label>
+            <input type="email" placeholder="jane@example.com">
+        </div>
+        <div class="field">
+            <label>Date</label>
+            <div class="date-row">
+                <div class="date-display" id="dateDisplay">No date selected</div>
+                <button class="date-btn" id="openModal" type="button">Select a date</button>
+            </div>
+        </div>
+        <div class="field">
+            <label>Time</label>
+            <select>
+                <option>9:00 AM</option><option>10:00 AM</option>
+                <option>11:00 AM</option><option>2:00 PM</option>
+                <option>3:00 PM</option><option>4:00 PM</option>
+            </select>
+        </div>
+        <div class="field">
+            <label>Notes <span style="color:#9ca3af;font-weight:400">(optional)</span></label>
+            <textarea placeholder="Anything we should know..."></textarea>
+        </div>
+        <button class="submit-btn" type="button">Book Meeting</button>
+    </div>
+</main>
+
+<!-- Slot machine modal -->
+<div class="overlay" id="overlay">
+    <div class="modal">
+        <div class="modal-title">Select a Date</div>
+        <div class="machine">
+            <div class="slots-area">
+                <div class="slot-col">
+                    <div class="slot-col-label">Day</div>
+                    <div class="slot-window" id="wDay"><div class="slot-center"></div></div>
+                </div>
+                <div class="slot-col">
+                    <div class="slot-col-label">Month</div>
+                    <div class="slot-window" id="wMonth"><div class="slot-center"></div></div>
+                </div>
+                <div class="slot-col">
+                    <div class="slot-col-label">Year</div>
+                    <div class="slot-window" id="wYear"><div class="slot-center"></div></div>
+                </div>
+            </div>
+
+            <!-- Lever -->
+            <div class="lever-area">
+                <div class="lever-label">Pull</div>
+                <div class="lever-track">
+                    <div class="lever-ball" id="leverBall"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal-btns">
+            <button class="btn btn-secondary" id="btnSpin">Spin Again</button>
+            <button class="btn btn-primary"   id="btnConfirm" disabled>Confirm</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ── Data ──────────────────────────────────────────────────────────
+const DAYS   = Array.from({length: 28}, (_, i) => String(i + 1).padStart(2, '0'));
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const YEARS  = ['2025','2026','2027','2028','2029','2030'];
+
+const ITEM_H   = 60;
+const WINDOW_H = 180;
+const REPEATS  = 60;
+// Minimum items to scroll past before stopping (~4000px worth)
+const MIN_AHEAD = Math.ceil(4000 / ITEM_H); // 67 items
+
+// ── Reel class ────────────────────────────────────────────────────
+class Reel {
+    constructor(windowEl, items) {
+        this.items = items;
+        this.all   = Array.from({length: REPEATS}, () => items).flat();
+
+        this.inner = document.createElement('div');
+        this.inner.className = 'reel-inner';
+        this.all.forEach(val => {
+            const d = document.createElement('div');
+            d.className = 'reel-item';
+            d.textContent = val;
+            this.inner.appendChild(d);
+        });
+        windowEl.appendChild(this.inner);
+
+        // Start in the middle of the array so we always have room ahead
+        this.idx = Math.floor(REPEATS / 2) * items.length;
+        this._applyY(this._toY(this.idx));
+    }
+
+    _toY(idx) {
+        return -(idx * ITEM_H) + (WINDOW_H / 2 - ITEM_H / 2);
+    }
+
+    _applyY(y) {
+        this.inner.style.transform = `translateY(${y}px)`;
+    }
+
+    // After a spin, snap back to the same value near the middle of the array.
+    // Since every index with the same value produces an identical visual,
+    // this is completely invisible to the user but prevents index overflow.
+    _resetToMiddle(val) {
+        const mid = Math.floor(REPEATS / 2) * this.items.length;
+        let newIdx = mid;
+        for (let i = mid; i < mid + this.items.length; i++) {
+            if (this.all[i] === val) { newIdx = i; break; }
+        }
+        this.inner.style.transition = 'none';
+        this._applyY(this._toY(newIdx));
+        void this.inner.offsetHeight; // force reflow so next transition isn't skipped
+        this.idx = newIdx;
+    }
+
+    spin(targetVal, duration) {
+        return new Promise(resolve => {
+            // Find the first occurrence of targetVal at least MIN_AHEAD items ahead
+            let targetIdx = -1;
+            for (let i = this.idx + MIN_AHEAD; i < this.all.length; i++) {
+                if (this.all[i] === targetVal) { targetIdx = i; break; }
+            }
+            if (targetIdx < 0) targetIdx = this.idx + MIN_AHEAD; // shouldn't happen with REPEATS=60
+
+            const y0  = this._toY(this.idx);
+            const y1  = this._toY(targetIdx);
+            const t0  = performance.now();
+            const ease = t => 1 - Math.pow(1 - t, 4); // quartic ease-out
+
+            const frame = now => {
+                const t = Math.min((now - t0) / duration, 1);
+                this._applyY(y0 + (y1 - y0) * ease(t));
+                if (t < 1) {
+                    requestAnimationFrame(frame);
+                } else {
+                    this.idx = targetIdx;
+                    this._resetToMiddle(targetVal); // prevent overflow on next spin
+                    resolve();
+                }
+            };
+            requestAnimationFrame(frame);
+        });
+    }
+}
+
+// ── Init reels ────────────────────────────────────────────────────
+const reelDay   = new Reel(document.getElementById('wDay'),   DAYS);
+const reelMonth = new Reel(document.getElementById('wMonth'), MONTHS);
+const reelYear  = new Reel(document.getElementById('wYear'),  YEARS);
+
+// ── State ─────────────────────────────────────────────────────────
+let isSpinning = false;
+let finalDay, finalMonth, finalYear;
+
+const btnSpin     = document.getElementById('btnSpin');
+const btnConfirm  = document.getElementById('btnConfirm');
+const overlay     = document.getElementById('overlay');
+const dateDisplay = document.getElementById('dateDisplay');
+const leverBall   = document.getElementById('leverBall');
+
+function rand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+function spin() {
+    if (isSpinning) return;
+    isSpinning = true;
+    btnSpin.disabled    = true;
+    btnConfirm.disabled = true;
+
+    finalDay   = rand(DAYS);
+    finalMonth = rand(MONTHS);
+    finalYear  = rand(YEARS);
+
+    // All reels start together, stop sequentially: day → month → year
+    Promise.all([
+        reelDay.spin(finalDay,     1600),
+        reelMonth.spin(finalMonth, 2100),
+        reelYear.spin(finalYear,   2600),
+    ]).then(() => {
+        isSpinning = false;
+        btnSpin.disabled    = false;
+        btnConfirm.disabled = false;
+    });
+}
+
+// ── Lever ─────────────────────────────────────────────────────────
+// track: 148px tall, ball: 32px, starts at top:4px → max top = 148-32-4 = 112
+const LEVER_BOTTOM = 112;
+const LEVER_TOP    = 4;
+
+function pullLever() {
+    if (isSpinning) return;
+
+    // 1. Snap to top with no transition (in case it's mid-animation)
+    leverBall.style.transition = 'none';
+    leverBall.style.top = LEVER_TOP + 'px';
+
+    // Double-rAF: ensures the browser commits the 'none' state
+    // before we start the pull-down animation
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+
+        // 2. Pull down — fast ease-in (feels weighted)
+        leverBall.style.transition = 'top 0.22s cubic-bezier(0.55, 0, 1, 1)';
+        leverBall.style.top = LEVER_BOTTOM + 'px';
+
+        setTimeout(() => {
+            // 3. Spring back up — ease-out with slight overshoot
+            leverBall.style.transition = 'top 0.5s cubic-bezier(0.17, 0.67, 0.3, 1.2)';
+            leverBall.style.top = LEVER_TOP + 'px';
+
+            // 4. Trigger spin while the lever is still rising
+            setTimeout(spin, 100);
+        }, 240);
+
+    }));
+}
+
+leverBall.addEventListener('click', pullLever);
+btnSpin.addEventListener('click', spin);
+
+btnConfirm.addEventListener('click', () => {
+    dateDisplay.textContent = `${finalDay} ${finalMonth} ${finalYear}`;
+    dateDisplay.classList.add('set');
+    overlay.style.display = 'none';
+});
+
+document.getElementById('openModal').addEventListener('click', () => {
+    overlay.style.display = 'flex';
+    spin();
+});
+
+overlay.addEventListener('click', e => {
+    if (e.target === overlay && !isSpinning) overlay.style.display = 'none';
+});
+</script>
+
+</body>
+</html>

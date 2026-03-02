@@ -2,201 +2,436 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Volume</title>
+    <title>Lo-Fi Study Beats — Watchr</title>
     <style>
+        :root { --red: #ef4444; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            background: #f3f4f6;
+            background: #0f0f0f;
+            color: #fff;
             font-family: system-ui, sans-serif;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
+            font-size: 14px;
         }
 
-        .card {
-            background: #fff;
-            border-radius: 12px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06);
-            padding: 24px;
-            width: 480px;
+        /* ── Nav ── */
+        nav {
+            position: sticky; top: 0; z-index: 100;
+            background: #0f0f0f;
+            border-bottom: 1px solid #272727;
+            height: 56px;
+            display: flex; align-items: center;
+            padding: 0 20px; gap: 16px;
+        }
+        .nav-logo { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; white-space: nowrap; }
+        .nav-logo span { color: var(--red); }
+        .nav-search { flex: 1; max-width: 440px; margin: 0 auto; display: flex; }
+        .nav-search input {
+            flex: 1;
+            background: #121212; border: 1px solid #333; border-right: none;
+            border-radius: 20px 0 0 20px; padding: 7px 16px;
+            color: #fff; font-size: 14px; outline: none;
+        }
+        .nav-search button {
+            background: #222; border: 1px solid #333; border-left: none;
+            border-radius: 0 20px 20px 0; padding: 0 14px;
+            color: #aaa; cursor: pointer; font-size: 14px;
+        }
+        .nav-avatar {
+            width: 32px; height: 32px; border-radius: 50%; margin-left: auto;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 13px; font-weight: 600; flex-shrink: 0;
         }
 
-        .field-label {
-            font-size: 20px;
-            font-weight: 500;
-            color: #374151;
-            margin-bottom: 20px;
-            text-align: center;
+        /* ── Layout ── */
+        .layout {
+            max-width: 1200px; margin: 0 auto;
+            padding: 20px 24px;
+            display: grid;
+            grid-template-columns: 1fr 340px;
+            gap: 24px;
         }
 
-        .field-hint {
-            font-size: 12px;
-            color: #9ca3af;
-            margin-bottom: 12px;
+        /* ── Player ── */
+        .player-wrap {
+            position: relative;
+            background: #000;
+            border-radius: 10px;
+            aspect-ratio: 16/9;
+            margin-bottom: 14px;
+            overflow: visible; /* let popup escape */
         }
+        .screen {
+            position: absolute; inset: 0;
+            border-radius: 10px; overflow: hidden;
+            background: linear-gradient(160deg, #1a1a2e 0%, #16213e 45%, #0f3460 100%);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .waveform { display: flex; gap: 3px; align-items: center; height: 56px; }
+        .wave-bar {
+            width: 3px; border-radius: 2px;
+            background: rgba(255,255,255,0.12);
+            animation: wave var(--dur) ease-in-out infinite alternate;
+            animation-delay: var(--delay);
+            height: var(--min);
+        }
+        @keyframes wave { to { height: var(--max); } }
 
+        /* Controls */
+        .controls {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            background: linear-gradient(transparent, rgba(0,0,0,0.88));
+            padding: 28px 14px 10px;
+            border-radius: 0 0 10px 10px;
+            display: flex; flex-direction: column; gap: 7px;
+            overflow: visible;
+        }
+        .progress-wrap {
+            height: 3px; background: rgba(255,255,255,0.2);
+            border-radius: 2px; cursor: pointer; position: relative;
+        }
+        .progress-fill {
+            height: 100%; width: 36%; background: var(--red);
+            border-radius: 2px; position: relative;
+        }
+        .progress-fill::after {
+            content: ''; position: absolute; right: -5px; top: 50%;
+            transform: translateY(-50%);
+            width: 10px; height: 10px; background: #fff; border-radius: 50%;
+        }
+        .ctrl-row { display: flex; align-items: center; gap: 4px; overflow: visible; }
+        .ctrl-btn {
+            background: none; border: none; color: #fff;
+            padding: 5px 6px; border-radius: 4px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: background 0.1s;
+        }
+        .ctrl-btn:hover { background: rgba(255,255,255,0.1); }
+        .ctrl-btn svg { width: 20px; height: 20px; fill: currentColor; display: block; }
+        .time-disp { font-size: 12px; color: #ccc; white-space: nowrap; padding: 0 6px; }
+        .spacer { flex: 1; }
+
+        /* Volume popup */
+        .vol-wrap { position: relative; }
+        .vol-popup {
+            position: absolute;
+            bottom: calc(100% + 14px);
+            left: 50%; transform: translateX(-50%);
+            background: #fff; border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            padding: 16px 16px 12px;
+            width: 390px;
+            z-index: 200;
+            display: none;
+        }
+        .vol-popup::after {
+            content: ''; position: absolute;
+            bottom: -5px; left: 50%; transform: translateX(-50%) rotate(45deg);
+            width: 10px; height: 10px; background: #fff; border-radius: 2px;
+        }
+        .popup-label {
+            font-size: 13px; font-weight: 500; color: #374151;
+            text-align: center; margin-bottom: 10px;
+        }
         canvas {
-            display: block;
-            width: 100%;
-            border-radius: 8px;
-            background: #f9fafb;
-            border: 1px solid #e5e7eb;
-            cursor: crosshair;
+            display: block; width: 100%;
+            border-radius: 8px; background: #f9fafb;
+            border: 1px solid #e5e7eb; cursor: crosshair;
         }
+        .popup-footer {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-top: 8px;
+        }
+        .popup-value { font-size: 13px; color: #6b7280; }
+        .popup-value span { font-weight: 600; color: #111827; font-size: 15px; }
+        .popup-reset { font-size: 12px; color: #d1d5db; cursor: default; transition: color 0.15s; }
+        .popup-reset.active { color: #6b7280; cursor: pointer; }
+        .popup-reset.active:hover { color: #111827; }
 
-        .field-footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 10px;
+        /* ── Video info ── */
+        .video-title {
+            font-size: 18px; font-weight: 600; line-height: 1.4; margin-bottom: 10px;
         }
+        .video-meta {
+            display: flex; justify-content: space-between; align-items: center;
+            padding-bottom: 12px; border-bottom: 1px solid #272727; margin-bottom: 14px;
+        }
+        .video-stats { font-size: 13px; color: #aaa; }
+        .action-btns { display: flex; gap: 8px; }
+        .action-btn {
+            display: flex; align-items: center; gap: 6px;
+            background: #272727; border: none; color: #fff;
+            padding: 8px 14px; border-radius: 20px;
+            font-size: 13px; font-family: system-ui; cursor: pointer;
+        }
+        .action-btn:hover { background: #3a3a3a; }
+        .channel-row {
+            display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+        }
+        .channel-avatar {
+            width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
+            background: linear-gradient(135deg, #f59e0b, #ef4444);
+        }
+        .channel-name { font-size: 14px; font-weight: 500; }
+        .channel-subs { font-size: 12px; color: #aaa; margin-top: 2px; }
+        .subscribe-btn {
+            margin-left: auto; background: #fff; color: #000; border: none;
+            padding: 9px 18px; border-radius: 20px; font-size: 13px;
+            font-weight: 600; font-family: system-ui; cursor: pointer;
+        }
+        .description {
+            background: #1a1a1a; border-radius: 8px; padding: 12px 14px;
+            font-size: 13px; color: #aaa; line-height: 1.6; margin-bottom: 24px;
+        }
+        .description strong { color: #fff; }
 
-        .field-value {
-            font-size: 15px;
-            color: #6b7280;
-        }
+        /* ── Comments ── */
+        .comments-header { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+        .comment { display: flex; gap: 12px; margin-bottom: 20px; }
+        .comment-avatar { width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; }
+        .comment-name { font-size: 13px; font-weight: 500; }
+        .comment-date { font-size: 12px; color: #aaa; margin-left: 8px; }
+        .comment-text { font-size: 14px; color: #ccc; margin-top: 4px; line-height: 1.5; }
+        .comment-likes { font-size: 12px; color: #aaa; margin-top: 6px; }
 
-        .field-value span {
-            font-weight: 600;
-            color: #111827;
+        /* ── Sidebar ── */
+        aside { display: flex; flex-direction: column; gap: 10px; padding-top: 4px; }
+        .sug-card { display: flex; gap: 8px; cursor: pointer; }
+        .sug-thumb {
+            width: 160px; height: 90px; border-radius: 6px; flex-shrink: 0;
         }
-
-        .field-reset {
-            font-size: 12px;
-            color: #d1d5db;
-            cursor: default;
-            transition: color 0.15s;
+        .sug-title {
+            font-size: 13px; font-weight: 500; color: #ddd; line-height: 1.4; margin-bottom: 4px;
         }
-
-        .field-reset.active {
-            color: #6b7280;
-            cursor: pointer;
-        }
-
-        .field-reset.active:hover {
-            color: #111827;
-        }
-
-        #volNum
-        {
-            font-size: 20px;
-        }
+        .sug-card:hover .sug-title { color: #fff; }
+        .sug-sub { font-size: 12px; color: #aaa; }
     </style>
 </head>
 <body>
-<div class="card">
-    <div class="field-label">CHOOSE YOUR VOLUME...</div>
 
-    <canvas id="c"></canvas>
-
-    <div class="field-footer">
-        <div class="field-value">Volume: <span id="volNum">0%</span></div>
-        <div class="field-reset" id="resetBtn">Reset</div>
+<nav>
+    <div class="nav-logo">Watch<span>r</span></div>
+    <div class="nav-search">
+        <input type="text" value="lo fi chill beats 2 hours">
+        <button>🔍</button>
     </div>
+    <div class="nav-avatar">A</div>
+</nav>
+
+<div class="layout">
+<main>
+
+    <!-- Player -->
+    <div class="player-wrap">
+        <div class="screen">
+            <div class="waveform" id="waveform"></div>
+        </div>
+        <div class="controls">
+            <div class="progress-wrap"><div class="progress-fill"></div></div>
+            <div class="ctrl-row">
+                <button class="ctrl-btn">
+                    <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                </button>
+                <button class="ctrl-btn">
+                    <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6h2v12h-2z"/></svg>
+                </button>
+
+                <!-- Volume button + popup -->
+                <div class="vol-wrap">
+                    <button class="ctrl-btn" id="volBtn">
+                        <svg id="volIcon" viewBox="0 0 24 24">
+                            <path id="volPath" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
+                        </svg>
+                    </button>
+                    <div class="vol-popup" id="volPopup">
+                        <div class="popup-label">CHOOSE YOUR VOLUME...</div>
+                        <canvas id="c"></canvas>
+                        <div class="popup-footer">
+                            <div class="popup-value">Volume: <span id="volNum">0%</span></div>
+                            <div class="popup-reset" id="resetBtn">Reset</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="time-disp">4:32 / 2:07:44</div>
+                <div class="spacer"></div>
+                <button class="ctrl-btn">
+                    <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.03 7.03 0 0 0-1.62-.94l-.36-2.54A.484.484 0 0 0 14 2h-4a.484.484 0 0 0-.48.41l-.36 2.54a7.03 7.03 0 0 0-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.64 8.47a.48.48 0 0 0 .12.61l2.03 1.58a7.18 7.18 0 0 0-.07.94c0 .33.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32a.49.49 0 0 0 .59.22l2.39-.96c.5.36 1.04.67 1.62.94l.36 2.54c.05.24.27.41.48.41h4c.21 0 .43-.17.48-.41l.36-2.54a7.03 7.03 0 0 0 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+                </button>
+                <button class="ctrl-btn">
+                    <svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Video info -->
+    <h1 class="video-title">Lo-Fi Hip Hop Radio 📚 — Beats to Relax / Study to [2 Hour Mix]</h1>
+    <div class="video-meta">
+        <div class="video-stats">2.4M views &nbsp;·&nbsp; Mar 14, 2024</div>
+        <div class="action-btns">
+            <button class="action-btn">👍 &nbsp;142K</button>
+            <button class="action-btn">👎</button>
+            <button class="action-btn">↗ Share</button>
+            <button class="action-btn">⬇ Save</button>
+        </div>
+    </div>
+    <div class="channel-row">
+        <div class="channel-avatar"></div>
+        <div>
+            <div class="channel-name">ChillWave Studios ✓</div>
+            <div class="channel-subs">1.2M subscribers</div>
+        </div>
+        <button class="subscribe-btn">Subscribe</button>
+    </div>
+    <div class="description">
+        <strong>Lo-fi hip hop beats for studying, relaxing, and focusing.</strong><br><br>
+        Perfect background music for long study sessions, late-night coding, or just unwinding after a long day.
+        No lyrics, no interruptions — just pure chill vibes. New mixes every Friday.
+    </div>
+
+    <!-- Comments -->
+    <div class="comments-header">87,412 Comments</div>
+
+    <div class="comment">
+        <div class="comment-avatar" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)"></div>
+        <div>
+            <span class="comment-name">@quietstudier</span>
+            <span class="comment-date">2 weeks ago</span>
+            <div class="comment-text">I've been using this playlist for 3 years. My GPA went from 2.1 to 3.8. Coincidence? I think not.</div>
+            <div class="comment-likes">👍 14.2K &nbsp;·&nbsp; Reply</div>
+        </div>
+    </div>
+    <div class="comment">
+        <div class="comment-avatar" style="background:linear-gradient(135deg,#f59e0b,#ef4444)"></div>
+        <div>
+            <span class="comment-name">@nightowlcoder</span>
+            <span class="comment-date">1 month ago</span>
+            <div class="comment-text">3am, 400 lines of code deep, cold coffee on the desk. This playlist is carrying me through this deadline.</div>
+            <div class="comment-likes">👍 8.7K &nbsp;·&nbsp; Reply</div>
+        </div>
+    </div>
+    <div class="comment">
+        <div class="comment-avatar" style="background:linear-gradient(135deg,#10b981,#3b82f6)"></div>
+        <div>
+            <span class="comment-name">@just_vibing_here</span>
+            <span class="comment-date">3 months ago</span>
+            <div class="comment-text">tried to adjust the volume. took me 4 tries. worth it.</div>
+            <div class="comment-likes">👍 21.1K &nbsp;·&nbsp; Reply</div>
+        </div>
+    </div>
+
+</main>
+
+<!-- Sidebar -->
+<aside>
+    <div class="sug-card">
+        <div class="sug-thumb" style="background:linear-gradient(135deg,#1a1a2e,#0f3460)"></div>
+        <div><div class="sug-title">Jazz Hop Café ☕ — Cozy Beats to Study/Work to</div><div class="sug-sub">Café Vibes · 1.8M views</div></div>
+    </div>
+    <div class="sug-card">
+        <div class="sug-thumb" style="background:linear-gradient(135deg,#2d1b69,#11998e)"></div>
+        <div><div class="sug-title">Deep Focus — 4 Hours of Flow State Music</div><div class="sug-sub">FocusFlow · 3.1M views</div></div>
+    </div>
+    <div class="sug-card">
+        <div class="sug-thumb" style="background:linear-gradient(135deg,#f093fb,#f5576c)"></div>
+        <div><div class="sug-title">Rainy Day Lo-Fi 🌧️ — Ambient Piano Beats</div><div class="sug-sub">AmbientAtlas · 892K views</div></div>
+    </div>
+    <div class="sug-card">
+        <div class="sug-thumb" style="background:linear-gradient(135deg,#4facfe,#00f2fe)"></div>
+        <div><div class="sug-title">Midnight City — Late Night Chill Playlist</div><div class="sug-sub">NightFreq · 2.3M views</div></div>
+    </div>
+    <div class="sug-card">
+        <div class="sug-thumb" style="background:linear-gradient(135deg,#f7971e,#ffd200)"></div>
+        <div><div class="sug-title">Morning Routine Music 🌅 — Calm & Peaceful</div><div class="sug-sub">SunriseBeats · 556K views</div></div>
+    </div>
+    <div class="sug-card">
+        <div class="sug-thumb" style="background:linear-gradient(135deg,#a18cd1,#fbc2eb)"></div>
+        <div><div class="sug-title">Chillhop Essentials — Spring 2024 🌸</div><div class="sug-sub">Chillhop Music · 4.2M views</div></div>
+    </div>
+</aside>
 </div>
 
 <script>
-const canvas = document.getElementById('c');
-const ctx    = canvas.getContext('2d');
-const volEl  = document.getElementById('volNum');
-const resetBtn = document.getElementById('resetBtn');
+// ── Waveform ─────────────────────────────────────────
+const wf = document.getElementById('waveform');
+for (let i = 0; i < 52; i++) {
+    const b = document.createElement('div');
+    b.className = 'wave-bar';
+    b.style.setProperty('--min', (4  + Math.random() * 8).toFixed(0)  + 'px');
+    b.style.setProperty('--max', (18 + Math.random() * 36).toFixed(0) + 'px');
+    b.style.setProperty('--dur', (0.7 + Math.random() * 1.3).toFixed(2) + 's');
+    b.style.setProperty('--delay', (Math.random() * 1.5).toFixed(2) + 's');
+    wf.appendChild(b);
+}
 
-// Internal resolution
-const W = 480, H = 200;
+// ── Popup toggle ─────────────────────────────────────
+const volBtn   = document.getElementById('volBtn');
+const volPopup = document.getElementById('volPopup');
+
+volBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    volPopup.style.display = volPopup.style.display === 'block' ? 'none' : 'block';
+});
+document.addEventListener('click', e => {
+    if (!volPopup.contains(e.target) && e.target !== volBtn)
+        volPopup.style.display = 'none';
+});
+
+// ── Catapult ─────────────────────────────────────────
+const canvas   = document.getElementById('c');
+const ctx      = canvas.getContext('2d');
+const volEl    = document.getElementById('volNum');
+const resetBtn = document.getElementById('resetBtn');
+const volPath  = document.getElementById('volPath');
+
+const W = 358, H = 175;
 canvas.width  = W;
 canvas.height = H;
 
-const GROUND_Y = H - 28;
+const GROUND_Y = H - 26;
 const GRAVITY  = 0.38;
 const POWER    = 0.20;
-const MAX_PULL = 65;
-const BALL_R   = 9;
+const MAX_PULL = 58;
+const BALL_R   = 8;
+const SX = 50, SY = GROUND_Y;
+const FORK_H = 44, FORK_W = 10;
+const REST = { x: SX, y: SY - FORK_H - 5 };
+const ZONE_X0 = SX, ZONE_X1 = W - 18;
 
-// Slingshot
-const SX = 58, SY = GROUND_Y;
-const FORK_H = 50, FORK_W = 11;
-const REST   = { x: SX, y: SY - FORK_H - 6 };
+let state = 'idle', ball = { x: REST.x, y: REST.y };
+let vel = { x: 0, y: 0 }, trail = [], landX = null;
 
-// Volume zone
-const ZONE_X0 = SX;
-const ZONE_X1 = W - 24;
-
-let state  = 'idle';
-let ball   = { x: REST.x, y: REST.y };
-let vel    = { x: 0, y: 0 };
-let trail  = [];
-let volume = null;
-let landX  = null;
-
-function reset() {
-    ball   = { x: REST.x, y: REST.y };
-    vel    = { x: 0, y: 0 };
-    trail  = [];
-    landX  = null;
-    volume = null;
-    state  = 'idle';
-    volEl.textContent = '—';
+function resetCatapult() {
+    ball = { x: REST.x, y: REST.y };
+    vel  = { x: 0, y: 0 };
+    trail = []; landX = null; state = 'idle';
     resetBtn.classList.remove('active');
 }
 
-// ── Draw ────────────────────────────────────────────
-
 function drawGround() {
-    ctx.strokeStyle = '#e5e7eb';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(16, GROUND_Y);
-    ctx.lineTo(W - 16, GROUND_Y);
-    ctx.stroke();
-
-    // Tick marks & labels at 0, 25, 50, 75, 100
+    ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(12, GROUND_Y); ctx.lineTo(W - 12, GROUND_Y); ctx.stroke();
     [0, 25, 50, 75, 100].forEach(v => {
         const x = ZONE_X0 + (v / 100) * (ZONE_X1 - ZONE_X0);
         ctx.strokeStyle = '#d1d5db';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(x, GROUND_Y);
-        ctx.lineTo(x, GROUND_Y + 5);
-        ctx.stroke();
-        ctx.fillStyle = '#9ca3af';
-        ctx.font = '13px system-ui, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(v + '%', x, GROUND_Y + 20);
+        ctx.beginPath(); ctx.moveTo(x, GROUND_Y); ctx.lineTo(x, GROUND_Y + 4); ctx.stroke();
+        ctx.fillStyle = '#9ca3af'; ctx.font = '10px system-ui'; ctx.textAlign = 'center';
+        ctx.fillText(v + '%', x, GROUND_Y + 15);
     });
 }
 
 function drawSlingshot() {
-    ctx.strokeStyle = '#9ca3af';
-    ctx.lineWidth = 3.5;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    // Stem
-    ctx.beginPath();
-    ctx.moveTo(SX, SY);
-    ctx.lineTo(SX, SY - FORK_H + 8);
-    ctx.stroke();
-
-    // Left prong
-    ctx.beginPath();
-    ctx.moveTo(SX, SY - FORK_H + 8);
-    ctx.lineTo(SX - FORK_W, SY - FORK_H);
-    ctx.stroke();
-
-    // Right prong
-    ctx.beginPath();
-    ctx.moveTo(SX, SY - FORK_H + 8);
-    ctx.lineTo(SX + FORK_W, SY - FORK_H);
-    ctx.stroke();
+    ctx.strokeStyle = '#9ca3af'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(SX, SY); ctx.lineTo(SX, SY - FORK_H + 7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(SX, SY - FORK_H + 7); ctx.lineTo(SX - FORK_W, SY - FORK_H); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(SX, SY - FORK_H + 7); ctx.lineTo(SX + FORK_W, SY - FORK_H); ctx.stroke();
 }
 
 function drawElastic() {
     if (state !== 'idle' && state !== 'pulling') return;
-    ctx.strokeStyle = '#d97706';
-    ctx.lineWidth = 1.8;
-    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#d97706'; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
     ctx.beginPath();
     ctx.moveTo(SX - FORK_W, SY - FORK_H);
     ctx.lineTo(ball.x, ball.y);
@@ -207,147 +442,114 @@ function drawElastic() {
 function drawPreview() {
     if (state !== 'pulling') return;
     let px = ball.x, py = ball.y;
-    let pvx = (REST.x - ball.x) * POWER;
-    let pvy = (REST.y - ball.y) * POWER;
-    ctx.setLineDash([3, 5]);
-    ctx.strokeStyle = '#d1d5db';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(px, py);
+    let pvx = (REST.x - ball.x) * POWER, pvy = (REST.y - ball.y) * POWER;
+    ctx.setLineDash([3, 5]); ctx.strokeStyle = '#d1d5db'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(px, py);
     for (let i = 0; i < 100; i++) {
-        pvy += GRAVITY;
-        px += pvx; py += pvy;
+        pvy += GRAVITY; px += pvx; py += pvy;
         if (py >= GROUND_Y) break;
         ctx.lineTo(px, py);
     }
-    ctx.stroke();
-    ctx.setLineDash([]);
+    ctx.stroke(); ctx.setLineDash([]);
 }
 
 function drawTrail() {
     if (trail.length < 2) return;
-    ctx.strokeStyle = '#e5e7eb';
-    ctx.lineWidth = 1.5;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(trail[0].x, trail[0].y);
+    ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(trail[0].x, trail[0].y);
     for (let i = 1; i < trail.length; i++) ctx.lineTo(trail[i].x, trail[i].y);
     ctx.stroke();
 }
 
 function drawLandingLine() {
     if (state !== 'landed' || landX === null) return;
-    ctx.strokeStyle = '#6b7280';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([4, 4]);
-    ctx.beginPath();
-    ctx.moveTo(landX, 12);
-    ctx.lineTo(landX, GROUND_Y);
-    ctx.stroke();
-    ctx.setLineDash([]);
+    ctx.strokeStyle = '#9ca3af'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(landX, 8); ctx.lineTo(landX, GROUND_Y);
+    ctx.stroke(); ctx.setLineDash([]);
 }
 
 function drawBall() {
-    ctx.beginPath();
-    ctx.arc(ball.x, ball.y, BALL_R, 0, Math.PI * 2);
-    ctx.fillStyle = '#374151';
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(ball.x, ball.y, BALL_R, 0, Math.PI * 2);
+    ctx.fillStyle = '#374151'; ctx.fill();
 }
 
 function render() {
     ctx.clearRect(0, 0, W, H);
-    drawGround();
-    drawTrail();
-    drawLandingLine();
-    drawPreview();
-    drawSlingshot();
-    drawElastic();
-    drawBall();
+    drawGround(); drawTrail(); drawLandingLine();
+    drawPreview(); drawSlingshot(); drawElastic(); drawBall();
 }
-
-// ── Physics ─────────────────────────────────────────
 
 function step() {
     if (state !== 'flying') return;
-    vel.y += GRAVITY;
-    ball.x += vel.x;
-    ball.y += vel.y;
+    vel.y += GRAVITY; ball.x += vel.x; ball.y += vel.y;
     trail.push({ x: ball.x, y: ball.y });
-    if (trail.length > 60) trail.shift();
-
+    if (trail.length > 55) trail.shift();
     if (ball.y + BALL_R >= GROUND_Y) {
         ball.y = GROUND_Y - BALL_R;
-        vel.y *= -0.3;
-        vel.x *= 0.6;
-        if (Math.abs(vel.y) < 0.7) {
-            land(ball.x);
-        }
+        vel.y *= -0.3; vel.x *= 0.6;
+        if (Math.abs(vel.y) < 0.7) land(ball.x);
     }
     if (ball.x > W + 20) land(ZONE_X1);
 }
 
 function land(x) {
-    state  = 'landed';
-    landX  = Math.max(ZONE_X0, Math.min(ZONE_X1, x));
-    ball.x = landX;
-    ball.y = GROUND_Y - BALL_R;
-    volume = Math.round(((landX - ZONE_X0) / (ZONE_X1 - ZONE_X0)) * 100);
-    volume = Math.max(0, Math.min(100, volume));
+    state = 'landed';
+    landX = Math.max(ZONE_X0, Math.min(ZONE_X1, x));
+    ball.x = landX; ball.y = GROUND_Y - BALL_R;
+    const v = Math.round(((landX - ZONE_X0) / (ZONE_X1 - ZONE_X0)) * 100);
+    const volume = Math.max(0, Math.min(100, v));
     volEl.textContent = volume + '%';
     resetBtn.classList.add('active');
+    // Update volume icon
+    if (volume === 0)
+        volPath.setAttribute('d', 'M16.5 12A4.5 4.5 0 0 0 14 7.97v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.796 8.796 0 0 0 21 12c0-4.28-3-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06A8.99 8.99 0 0 0 17.73 18l2 2L21 18.73 4.27 3zM12 4 9.91 6.09 12 8.18V4z');
+    else if (volume < 50)
+        volPath.setAttribute('d', 'M18.5 12A4.5 4.5 0 0 0 16 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z');
+    else
+        volPath.setAttribute('d', 'M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77 0-4.28-2.99-7.86-7-8.77z');
 }
 
-function loop() {
-    step();
-    render();
-    requestAnimationFrame(loop);
-}
-
-// ── Input ────────────────────────────────────────────
+function loop() { step(); render(); requestAnimationFrame(loop); }
 
 function getPos(e) {
-    const r   = canvas.getBoundingClientRect();
-    const scaleX = W / r.width;
-    const scaleY = H / r.height;
+    const r = canvas.getBoundingClientRect();
     const src = e.touches ? e.touches[0] : e;
     return {
-        x: (src.clientX - r.left) * scaleX,
-        y: (src.clientY - r.top)  * scaleY,
+        x: (src.clientX - r.left) * (W / r.width),
+        y: (src.clientY - r.top)  * (H / r.height),
     };
 }
 
 canvas.addEventListener('mousedown', e => {
+    e.stopPropagation();
     if (state === 'flying') return;
-    if (state === 'landed') { reset(); return; }
-    const p  = getPos(e);
+    if (state === 'landed') { resetCatapult(); return; }
+    const p = getPos(e);
     const dx = p.x - ball.x, dy = p.y - ball.y;
     if (Math.sqrt(dx * dx + dy * dy) < BALL_R + 10) state = 'pulling';
 });
-
 document.addEventListener('mousemove', e => {
     if (state !== 'pulling') return;
-    const p  = getPos(e);
+    const p = getPos(e);
     let dx = p.x - REST.x, dy = p.y - REST.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     if (dist > MAX_PULL) { dx = dx / dist * MAX_PULL; dy = dy / dist * MAX_PULL; }
     ball.x = Math.min(REST.x, REST.x + dx);
     ball.y = REST.y + dy;
 });
-
 document.addEventListener('mouseup', () => {
     if (state !== 'pulling') return;
-    vel.x  = (REST.x - ball.x) * POWER;
-    vel.y  = (REST.y - ball.y) * POWER;
-    state  = 'flying';
-    trail  = [{ x: ball.x, y: ball.y }];
+    vel.x = (REST.x - ball.x) * POWER;
+    vel.y = (REST.y - ball.y) * POWER;
+    state = 'flying'; trail = [{ x: ball.x, y: ball.y }];
 });
-
 resetBtn.addEventListener('click', () => {
-    if (resetBtn.classList.contains('active')) reset();
+    if (resetBtn.classList.contains('active')) resetCatapult();
 });
 
-reset();
+resetCatapult();
 loop();
 </script>
+
 </body>
 </html>
