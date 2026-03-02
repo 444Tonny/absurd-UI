@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Volume</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #f3f4f6;
+            font-family: system-ui, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06);
+            padding: 24px;
+            width: 480px;
+        }
+
+        .field-label {
+            font-size: 20px;
+            font-weight: 500;
+            color: #374151;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .field-hint {
+            font-size: 12px;
+            color: #9ca3af;
+            margin-bottom: 12px;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            border-radius: 8px;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            cursor: crosshair;
+        }
+
+        .field-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+        }
+
+        .field-value {
+            font-size: 15px;
+            color: #6b7280;
+        }
+
+        .field-value span {
+            font-weight: 600;
+            color: #111827;
+        }
+
+        .field-reset {
+            font-size: 12px;
+            color: #d1d5db;
+            cursor: default;
+            transition: color 0.15s;
+        }
+
+        .field-reset.active {
+            color: #6b7280;
+            cursor: pointer;
+        }
+
+        .field-reset.active:hover {
+            color: #111827;
+        }
+
+        #volNum
+        {
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+<div class="card">
+    <div class="field-label">CHOOSE YOUR VOLUME...</div>
+
+    <canvas id="c"></canvas>
+
+    <div class="field-footer">
+        <div class="field-value">Volume: <span id="volNum">0%</span></div>
+        <div class="field-reset" id="resetBtn">Reset</div>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+const volEl  = document.getElementById('volNum');
+const resetBtn = document.getElementById('resetBtn');
+
+// Internal resolution
+const W = 480, H = 200;
+canvas.width  = W;
+canvas.height = H;
+
+const GROUND_Y = H - 28;
+const GRAVITY  = 0.38;
+const POWER    = 0.20;
+const MAX_PULL = 65;
+const BALL_R   = 9;
+
+// Slingshot
+const SX = 58, SY = GROUND_Y;
+const FORK_H = 50, FORK_W = 11;
+const REST   = { x: SX, y: SY - FORK_H - 6 };
+
+// Volume zone
+const ZONE_X0 = SX;
+const ZONE_X1 = W - 24;
+
+let state  = 'idle';
+let ball   = { x: REST.x, y: REST.y };
+let vel    = { x: 0, y: 0 };
+let trail  = [];
+let volume = null;
+let landX  = null;
+
+function reset() {
+    ball   = { x: REST.x, y: REST.y };
+    vel    = { x: 0, y: 0 };
+    trail  = [];
+    landX  = null;
+    volume = null;
+    state  = 'idle';
+    volEl.textContent = '—';
+    resetBtn.classList.remove('active');
+}
+
+// ── Draw ────────────────────────────────────────────
+
+function drawGround() {
+    ctx.strokeStyle = '#e5e7eb';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(16, GROUND_Y);
+    ctx.lineTo(W - 16, GROUND_Y);
+    ctx.stroke();
+
+    // Tick marks & labels at 0, 25, 50, 75, 100
+    [0, 25, 50, 75, 100].forEach(v => {
+        const x = ZONE_X0 + (v / 100) * (ZONE_X1 - ZONE_X0);
+        ctx.strokeStyle = '#d1d5db';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x, GROUND_Y);
+        ctx.lineTo(x, GROUND_Y + 5);
+        ctx.stroke();
+        ctx.fillStyle = '#9ca3af';
+        ctx.font = '13px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(v + '%', x, GROUND_Y + 20);
+    });
+}
+
+function drawSlingshot() {
+    ctx.strokeStyle = '#9ca3af';
+    ctx.lineWidth = 3.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Stem
+    ctx.beginPath();
+    ctx.moveTo(SX, SY);
+    ctx.lineTo(SX, SY - FORK_H + 8);
+    ctx.stroke();
+
+    // Left prong
+    ctx.beginPath();
+    ctx.moveTo(SX, SY - FORK_H + 8);
+    ctx.lineTo(SX - FORK_W, SY - FORK_H);
+    ctx.stroke();
+
+    // Right prong
+    ctx.beginPath();
+    ctx.moveTo(SX, SY - FORK_H + 8);
+    ctx.lineTo(SX + FORK_W, SY - FORK_H);
+    ctx.stroke();
+}
+
+function drawElastic() {
+    if (state !== 'idle' && state !== 'pulling') return;
+    ctx.strokeStyle = '#d97706';
+    ctx.lineWidth = 1.8;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(SX - FORK_W, SY - FORK_H);
+    ctx.lineTo(ball.x, ball.y);
+    ctx.lineTo(SX + FORK_W, SY - FORK_H);
+    ctx.stroke();
+}
+
+function drawPreview() {
+    if (state !== 'pulling') return;
+    let px = ball.x, py = ball.y;
+    let pvx = (REST.x - ball.x) * POWER;
+    let pvy = (REST.y - ball.y) * POWER;
+    ctx.setLineDash([3, 5]);
+    ctx.strokeStyle = '#d1d5db';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    for (let i = 0; i < 100; i++) {
+        pvy += GRAVITY;
+        px += pvx; py += pvy;
+        if (py >= GROUND_Y) break;
+        ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+}
+
+function drawTrail() {
+    if (trail.length < 2) return;
+    ctx.strokeStyle = '#e5e7eb';
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(trail[0].x, trail[0].y);
+    for (let i = 1; i < trail.length; i++) ctx.lineTo(trail[i].x, trail[i].y);
+    ctx.stroke();
+}
+
+function drawLandingLine() {
+    if (state !== 'landed' || landX === null) return;
+    ctx.strokeStyle = '#6b7280';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(landX, 12);
+    ctx.lineTo(landX, GROUND_Y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+}
+
+function drawBall() {
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, BALL_R, 0, Math.PI * 2);
+    ctx.fillStyle = '#374151';
+    ctx.fill();
+}
+
+function render() {
+    ctx.clearRect(0, 0, W, H);
+    drawGround();
+    drawTrail();
+    drawLandingLine();
+    drawPreview();
+    drawSlingshot();
+    drawElastic();
+    drawBall();
+}
+
+// ── Physics ─────────────────────────────────────────
+
+function step() {
+    if (state !== 'flying') return;
+    vel.y += GRAVITY;
+    ball.x += vel.x;
+    ball.y += vel.y;
+    trail.push({ x: ball.x, y: ball.y });
+    if (trail.length > 60) trail.shift();
+
+    if (ball.y + BALL_R >= GROUND_Y) {
+        ball.y = GROUND_Y - BALL_R;
+        vel.y *= -0.3;
+        vel.x *= 0.6;
+        if (Math.abs(vel.y) < 0.7) {
+            land(ball.x);
+        }
+    }
+    if (ball.x > W + 20) land(ZONE_X1);
+}
+
+function land(x) {
+    state  = 'landed';
+    landX  = Math.max(ZONE_X0, Math.min(ZONE_X1, x));
+    ball.x = landX;
+    ball.y = GROUND_Y - BALL_R;
+    volume = Math.round(((landX - ZONE_X0) / (ZONE_X1 - ZONE_X0)) * 100);
+    volume = Math.max(0, Math.min(100, volume));
+    volEl.textContent = volume + '%';
+    resetBtn.classList.add('active');
+}
+
+function loop() {
+    step();
+    render();
+    requestAnimationFrame(loop);
+}
+
+// ── Input ────────────────────────────────────────────
+
+function getPos(e) {
+    const r   = canvas.getBoundingClientRect();
+    const scaleX = W / r.width;
+    const scaleY = H / r.height;
+    const src = e.touches ? e.touches[0] : e;
+    return {
+        x: (src.clientX - r.left) * scaleX,
+        y: (src.clientY - r.top)  * scaleY,
+    };
+}
+
+canvas.addEventListener('mousedown', e => {
+    if (state === 'flying') return;
+    if (state === 'landed') { reset(); return; }
+    const p  = getPos(e);
+    const dx = p.x - ball.x, dy = p.y - ball.y;
+    if (Math.sqrt(dx * dx + dy * dy) < BALL_R + 10) state = 'pulling';
+});
+
+document.addEventListener('mousemove', e => {
+    if (state !== 'pulling') return;
+    const p  = getPos(e);
+    let dx = p.x - REST.x, dy = p.y - REST.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > MAX_PULL) { dx = dx / dist * MAX_PULL; dy = dy / dist * MAX_PULL; }
+    ball.x = Math.min(REST.x, REST.x + dx);
+    ball.y = REST.y + dy;
+});
+
+document.addEventListener('mouseup', () => {
+    if (state !== 'pulling') return;
+    vel.x  = (REST.x - ball.x) * POWER;
+    vel.y  = (REST.y - ball.y) * POWER;
+    state  = 'flying';
+    trail  = [{ x: ball.x, y: ball.y }];
+});
+
+resetBtn.addEventListener('click', () => {
+    if (resetBtn.classList.contains('active')) reset();
+});
+
+reset();
+loop();
+</script>
+</body>
+</html>
