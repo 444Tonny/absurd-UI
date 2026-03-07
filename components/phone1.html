@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify Account — Nexus</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0b0d12;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #e2e8f0;
+    }
+
+    /* ── Fake nav ── */
+    .nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      padding: 15px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      background: rgba(11,13,18,0.85);
+      backdrop-filter: blur(14px);
+      z-index: 10;
+    }
+
+    .nav-logo {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: #fff;
+    }
+    .nav-logo span { color: #818cf8; }
+
+    .nav-links {
+      display: flex;
+      gap: 28px;
+      font-size: 13px;
+      color: #475569;
+    }
+    .nav-links span { cursor: default; }
+    .nav-links span:last-child { color: #818cf8; cursor: pointer; }
+
+    /* ── Card ── */
+    .card {
+      background: #131620;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 18px;
+      padding: 36px 40px 32px;
+      width: 540px;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(129,140,248,0.04);
+    }
+
+    .card-header { margin-bottom: 28px; }
+
+    .card-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #818cf8;
+      background: rgba(129,140,248,0.1);
+      border: 1px solid rgba(129,140,248,0.2);
+      border-radius: 20px;
+      padding: 4px 10px;
+      margin-bottom: 14px;
+    }
+
+    .card-badge::before {
+      content: '';
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #818cf8;
+    }
+
+    .card-header h1 {
+      font-size: 21px;
+      font-weight: 600;
+      color: #f1f5f9;
+      margin-bottom: 6px;
+      letter-spacing: -0.3px;
+    }
+
+    /* ── Form ── */
+    .form-group { margin-bottom: 22px; }
+
+    .form-label {
+      display: block;
+      font-size: 15px;
+      font-weight: 500;
+      color: #ffffff;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 9px;
+    }
+
+    .email-input {
+      width: 100%;
+      background: #0b0d12;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 9px;
+      padding: 10px 14px;
+      font-size: 14px;
+      color: #e2e8f0;
+      outline: none;
+      transition: border-color 0.18s, box-shadow 0.18s;
+      font-family: system-ui, sans-serif;
+    }
+
+    .email-input:focus {
+      border-color: #818cf8;
+      box-shadow: 0 0 0 3px rgba(129,140,248,0.12);
+    }
+
+    .email-input::placeholder { color: #2d3748; }
+
+    /* ── Digit row ── */
+    .digit-row {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .digit-selector {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .digit-btn {
+      width: 34px;
+      height: 18px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      color: #2d3748;
+      font-size: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      transition: color 0.15s, background 0.15s;
+      padding: 0;
+      line-height: 1;
+    }
+
+    .digit-btn:hover {
+      color: #818cf8;
+      background: rgba(129,140,248,0.1);
+    }
+
+    .digit-display {
+      width: 34px;
+      height: 38px;
+      background: #0b0d12;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 7px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 17px;
+      font-weight: 600;
+      color: #e2e8f0;
+      cursor: ns-resize;
+      user-select: none;
+      transition: border-color 0.15s, box-shadow 0.15s, color 0.15s;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .digit-display:hover { border-color: rgba(129,140,248,0.4); }
+
+    .digit-display.flash {
+      border-color: #818cf8;
+      color: #c7d2fe;
+      box-shadow: 0 0 0 2px rgba(129,140,248,0.14);
+    }
+
+    .phone-sep {
+      font-size: 16px;
+      color: #2d3748;
+      align-self: center;
+      padding: 0 1px;
+      flex-shrink: 0;
+      font-weight: 300;
+      padding-top: 18px;
+    }
+
+    .phone-prefix {
+      font-size: 13px;
+      font-weight: 500;
+      color: #334155;
+      align-self: center;
+      padding-top: 18px;
+      margin-right: 2px;
+      flex-shrink: 0;
+    }
+
+    /* ── Divider ── */
+    .divider {
+      height: 1px;
+      background: rgba(255,255,255,0.05);
+      margin: 6px 0 22px;
+    }
+
+    /* ── Send button ── */
+    .send-btn {
+      width: 100%;
+      padding: 12px;
+      background: #6366f1;
+      border: none;
+      border-radius: 9px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+      cursor: pointer;
+      font-family: system-ui, sans-serif;
+      letter-spacing: 0.01em;
+      transition: background 0.18s, transform 0.1s, box-shadow 0.18s;
+      box-shadow: 0 4px 20px rgba(99,102,241,0.3);
+      margin-top: 4px;
+    }
+
+    .send-btn:hover {
+      background: #4f46e5;
+      box-shadow: 0 4px 28px rgba(99,102,241,0.45);
+    }
+
+    .send-btn:active { transform: scale(0.99); }
+
+    .terms {
+      text-align: center;
+      font-size: 12px;
+      color: #1e293b;
+      margin-top: 16px;
+    }
+
+    .terms a { color: #334155; text-decoration: none; }
+    .terms a:hover { color: #64748b; }
+
+    /* ── Error popup ── */
+    .popup-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+
+    .popup-overlay.visible {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .popup {
+      background: #131620;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      padding: 28px 32px 24px;
+      width: 340px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.7);
+      transform: scale(0.93) translateY(8px);
+      transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .popup-overlay.visible .popup {
+      transform: scale(1) translateY(0);
+    }
+
+    .popup-icon {
+      font-size: 30px;
+      display: block;
+      margin: auto;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .popup h2 {
+      text-align: center;
+      font-size: 19px;
+      font-weight: 600;
+      color: #f1f5f9;
+      margin-bottom: 8px;
+    }
+
+    .popup p {
+      text-align: center;
+      font-size: 15px;
+      color: #dbdbdb;
+      line-height: 1.55;
+      margin-bottom: 20px;
+    }
+
+    .popup-btn {
+      margin-top: 20px;
+      width: 100%;
+      padding: 10px;
+      background: #1e2130;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #94a3b8;
+      cursor: pointer;
+      font-family: system-ui, sans-serif;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .popup-btn:hover {
+      background: #252a3d;
+      color: #e2e8f0;
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-logo">Nex<span>us</span></div>
+  <div class="nav-links">
+    <span>Docs</span>
+    <span>Support</span>
+    <span>Sign in</span>
+  </div>
+</nav>
+
+<div class="card">
+  <div class="card-header">
+    <div class="card-badge">Identity Verification</div>
+    <h1>Confirm your contact info</h1>
+  </div>
+
+  <!-- Email -->
+  <div class="form-group">
+    <label class="form-label">Email address</label>
+    <input type="email" class="email-input" placeholder="you@example.com">
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- Phone number -->
+  <div class="form-group">
+    <label class="form-label">Phone number</label>
+    <div class="digit-row" id="phone-primary"></div>
+  </div>
+
+  <!-- Secondary phone -->
+  <div class="form-group">
+    <label class="form-label">Secondary phone number</label>
+    <div class="digit-row" id="phone-secondary"></div>
+  </div>
+
+  <button class="send-btn" id="send-btn">Send verification code</button>
+
+  <div class="terms">
+    By continuing you agree to our <a href="#">Terms</a> and <a href="#">Privacy Policy</a>
+  </div>
+</div>
+
+<!-- Error popup -->
+<div class="popup-overlay" id="popup-overlay">
+  <div class="popup">
+    <span class="popup-icon">❌</span>
+    <h2>Phone number not found.</h2>
+    <p>Please, try again.<br>
+    <button class="popup-btn" id="popup-close">OK</button>
+  </div>
+</div>
+
+<script>
+  var resetFns = [];
+
+  function buildPhoneRow(container) {
+    var values = new Array(10).fill(0);
+    var displays = [];
+
+    var dragIdx = null;
+    var dragStartY = null;
+    var dragBaseValue = null;
+
+    var prefix = document.createElement('span');
+    prefix.className = 'phone-prefix';
+    prefix.textContent = '+1';
+    container.appendChild(prefix);
+
+    for (var i = 0; i < 10; i++) {
+      if (i === 0) addSep(container, '\u2009(\u2009');
+      if (i === 3) addSep(container, '\u2009)\u2009');
+      if (i === 6) addSep(container, '\u2009\u2013\u2009');
+
+      var wrapper = document.createElement('div');
+      wrapper.className = 'digit-selector';
+
+      var up = document.createElement('button');
+      up.className = 'digit-btn';
+      up.innerHTML = '&#9650;';
+      up.setAttribute('tabindex', '-1');
+
+      var disp = document.createElement('div');
+      disp.className = 'digit-display';
+      disp.textContent = '0';
+      displays.push(disp);
+
+      var down = document.createElement('button');
+      down.className = 'digit-btn';
+      down.innerHTML = '&#9660;';
+      down.setAttribute('tabindex', '-1');
+
+      (function(idx, d) {
+        function update(delta) {
+          values[idx] = (values[idx] + delta + 10) % 10;
+          displays[idx].textContent = values[idx];
+          displays[idx].classList.add('flash');
+          setTimeout(function() { displays[idx].classList.remove('flash'); }, 180);
+        }
+
+        up.addEventListener('click', function() { update(1); });
+        down.addEventListener('click', function() { update(-1); });
+
+        d.addEventListener('wheel', function(e) {
+          e.preventDefault();
+          update(e.deltaY < 0 ? 1 : -1);
+        }, { passive: false });
+
+        d.addEventListener('mousedown', function(e) {
+          e.preventDefault();
+          dragIdx = idx;
+          dragStartY = e.clientY;
+          dragBaseValue = values[idx];
+          d.style.cursor = 'grabbing';
+        });
+      })(i, disp);
+
+      wrapper.appendChild(up);
+      wrapper.appendChild(disp);
+      wrapper.appendChild(down);
+      container.appendChild(wrapper);
+    }
+
+    document.addEventListener('mousemove', function(e) {
+      if (dragIdx === null) return;
+      var delta = Math.round((dragStartY - e.clientY) / 9);
+      var newVal = ((dragBaseValue + delta) % 10 + 10) % 10;
+      if (newVal !== values[dragIdx]) {
+        values[dragIdx] = newVal;
+        displays[dragIdx].textContent = newVal;
+        displays[dragIdx].classList.add('flash');
+        setTimeout(function() { displays[dragIdx].classList.remove('flash'); }, 180);
+      }
+    });
+
+    document.addEventListener('mouseup', function() {
+      if (dragIdx !== null) {
+        if (displays[dragIdx]) displays[dragIdx].style.cursor = 'ns-resize';
+        dragIdx = null;
+        dragStartY = null;
+        dragBaseValue = null;
+      }
+    });
+
+    return function reset() {
+      for (var i = 0; i < 10; i++) {
+        values[i] = 0;
+        displays[i].textContent = '0';
+        displays[i].classList.remove('flash');
+      }
+    };
+  }
+
+  function addSep(container, text) {
+    var sep = document.createElement('span');
+    sep.className = 'phone-sep';
+    sep.textContent = text;
+    container.appendChild(sep);
+  }
+
+  resetFns.push(buildPhoneRow(document.getElementById('phone-primary')));
+  resetFns.push(buildPhoneRow(document.getElementById('phone-secondary')));
+
+  document.getElementById('send-btn').addEventListener('click', function() {
+    document.getElementById('popup-overlay').classList.add('visible');
+  });
+
+  function closeAndReset() {
+    document.getElementById('popup-overlay').classList.remove('visible');
+    resetFns.forEach(function(fn) { fn(); });
+  }
+
+  document.getElementById('popup-close').addEventListener('click', closeAndReset);
+
+  document.getElementById('popup-overlay').addEventListener('click', function(e) {
+    if (e.target === e.currentTarget) closeAndReset();
+  });
+</script>
+</body>
+</html>

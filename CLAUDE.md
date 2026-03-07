@@ -63,9 +63,22 @@ Components are compact. Not full-screen experiences. Think: a card you'd embed i
     └── ...
 ```
 
+## Tone & Copy
+
+**Error messages, success states, labels, and any incidental text should be humorous whenever possible.**
+This is not a real product — lean into it. Absurd error messages, fake-serious warnings, broken Franglais, over-confident success toasts, passive-aggressive validation — all fair game.
+
+- Error: don't say "Invalid input." Say something like "Numéro de téléphone introuvable. Please, recommencer."
+- Success: don't say "Done!" Say "Félicitations, we think."
+- Labels can be slightly off ("Secondary phone number (in case we lose the first one)")
+- The copy should feel like a parody of a real UI, not a real UI
+
+The visual design stays professional. The words do not have to.
+
 ## Rules
 
 1. The mechanic is the joke — not the visual design
 2. Must look like a real UI component at first glance
 3. Must actually output a real value
 4. Compact — no full-screen game layouts
+5. All labels and button text must be at minimum **15px** font size
