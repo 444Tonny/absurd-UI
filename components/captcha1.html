@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Are CAPTCHAs Too Hard? — TechBanter</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #fff;
+      color: #1a1a1a;
+    }
+
+    /* ── Nav ── */
+    .nav {
+      background: #fff;
+      border-bottom: 1px solid #e5e5e5;
+      padding: 0 32px;
+      display: flex;
+      align-items: center;
+      height: 52px;
+      gap: 32px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .nav-logo { font-size: 18px; font-weight: 700; color: #111; }
+    .nav-links { display: flex; gap: 24px; font-size: 15px; color: #666; }
+    .nav-links span { cursor: default; }
+
+    /* ── Page ── */
+    .page {
+      max-width: 660px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+
+    /* ── Article ── */
+    .article-meta { font-size: 13px; color: #999; margin-bottom: 10px; }
+    .article-title { font-size: 26px; font-weight: 700; margin-bottom: 18px; line-height: 1.3; }
+    .article-body p { font-size: 15px; color: #555; line-height: 1.7; margin-bottom: 14px; }
+
+    hr { border: none; border-top: 1px solid #e5e5e5; margin: 32px 0; }
+
+    /* ── Comments ── */
+    .section-label { font-size: 18px; font-weight: 600; margin-bottom: 24px; }
+
+    .comment { display: flex; gap: 12px; margin-bottom: 20px; }
+    .avatar {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: #e9ecef;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; font-weight: 600; color: #6c757d;
+      flex-shrink: 0;
+    }
+    .comment-meta { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+    .comment-time { font-size: 12px; color: #aaa; font-weight: 400; margin-left: 8px; }
+    .comment-text { font-size: 15px; color: #555; line-height: 1.55; }
+
+    /* ── Comment form ── */
+    .form-section { margin-top: 32px; }
+
+    .form-label {
+      display: block;
+      font-size: 15px;
+      font-weight: 500;
+      margin-bottom: 8px;
+      color: #374151;
+    }
+
+    textarea {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 15px;
+      font-family: system-ui, sans-serif;
+      resize: vertical;
+      min-height: 100px;
+      outline: none;
+      color: #1a1a1a;
+    }
+    textarea:focus { border-color: #9ca3af; }
+
+    /* ── reCAPTCHA widget ── */
+    .rc-wrap { margin: 20px 0 8px; }
+
+    .rc-widget {
+      display: inline-flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #f9f9f9;
+      border: 1px solid #d3d3d3;
+      border-radius: 3px;
+      box-shadow: 0 0 4px 1px rgba(0,0,0,.09);
+      padding: 0 16px;
+      width: 302px;
+      height: 74px;
+    }
+
+    .rc-left { display: flex; align-items: center; gap: 14px; }
+
+    .rc-box {
+      width: 24px; height: 24px;
+      border: 2px solid #c1c1c1;
+      border-radius: 2px;
+      background: #fff;
+      cursor: pointer;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      transition: border-color 0.2s;
+    }
+    .rc-box:hover { border-color: #a0a0a0; }
+    .rc-box.checked { border-color: #4a90d9; }
+
+    .rc-checkmark { display: none; width: 16px; height: 16px; }
+    .rc-box.checked .rc-checkmark { display: block; }
+
+    .rc-spinner {
+      display: none;
+      width: 18px; height: 18px;
+      border: 2.5px solid #e5e5e5;
+      border-top-color: #4a90d9;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    .rc-box.loading .rc-spinner { display: block; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .rc-label { font-size: 15px; color: #1a1a1a; user-select: none; cursor: pointer; }
+
+    .rc-right {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+    .rc-icon { font-size: 22px; line-height: 1; }
+    .rc-name { font-size: 10px; font-weight: 700; color: #4a90d9; letter-spacing: 0.03em; }
+    .rc-terms { font-size: 8.5px; color: #b5b5b5; }
+
+    /* ── Puzzle card ── */
+    .puzzle-card {
+      display: none;
+      background: #fff;
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.09);
+    }
+    .puzzle-card.open { display: block; }
+
+    .puzzle-header {
+      background: #f9fafb;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 16px 20px;
+    }
+    .puzzle-title { font-size: 16px; font-weight: 600; color: #111; margin-bottom: 3px; }
+    .puzzle-step { font-size: 15px; color: #9ca3af; }
+
+    .puzzle-body { padding: 20px; }
+
+    /* ── Equation ── */
+    .equation-box {
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+
+    .eq-prompt {
+      font-size: 16px;
+      color: #5f5f5f;
+      margin-bottom: 25px;
+    }
+
+    .eq-expr {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 16px;
+      color: #1f2937;
+    }
+
+    .eq-frac {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      vertical-align: middle;
+    }
+    .eq-frac-num { padding: 0 6px 3px; font-size: 15px; }
+    .eq-frac-bar { height: 1.5px; background: #1f2937; width: 100%; }
+    .eq-frac-den { padding: 3px 6px 0; font-size: 15px; }
+
+    .eq-op { font-size: 20px; color: #374151; }
+
+    .eq-sum-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .eq-sigma-stack {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      line-height: 1.1;
+    }
+    .eq-sigma-top { font-size: 11px; color: #6b7280; }
+    .eq-sigma-sym { font-size: 28px; color: #1f2937; line-height: 1; }
+    .eq-sigma-bot { font-size: 11px; color: #6b7280; }
+
+    .eq-tail { font-size: 20px; color: #374151; }
+    .eq-qmark { font-size: 22px; font-weight: 700; color: #111; margin-left: 6px; }
+
+    /* ── Calculator hint ── */
+    .calc-hint {
+      font-size: 15px;
+      color: #000000;
+      margin-bottom: 14px;
+    }
+
+    /* ── Calculator ── */
+    .calculator {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 20px;
+    }
+
+    .calc-display {
+      background: #fff8ed;
+      border: 1px solid #fcd34d;
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 22px;
+      font-weight: 400;
+      text-align: right;
+      color: #1c1917;
+      margin-bottom: 12px;
+      min-height: 52px;
+      font-variant-numeric: tabular-nums;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .calc-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 7px;
+    }
+
+    .calc-btn {
+      padding: 13px 0;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: system-ui, sans-serif;
+      transition: filter 0.1s, transform 0.08s;
+      line-height: 1;
+    }
+    .calc-btn:active { transform: scale(0.94); filter: brightness(0.9); }
+
+    .btn-num   { background: #fef3c7; color: #78350f; border: 1px solid #fde68a; }
+    .btn-op    { background: #f97316; color: #fff;    border: 1px solid #ea580c; }
+    .btn-clear { background: #fca5a5; color: #7f1d1d; border: 1px solid #f87171; }
+    .btn-eq    { background: #dc2626; color: #fff;    border: 1px solid #b91c1c; }
+    .span2     { grid-column: span 2; }
+
+    .calc-msg {
+      text-align: center;
+      font-size: 15px;
+      color: #dc2626;
+      font-style: italic;
+      min-height: 20px;
+      margin-top: 8px;
+    }
+
+    /* ── Answer ── */
+    .answer-label {
+      display: block;
+      font-size: 15px;
+      font-weight: 500;
+      color: #374151;
+      margin-bottom: 8px;
+    }
+
+    .answer-row { display: flex; gap: 10px; }
+
+    .answer-input {
+      flex: 1;
+      padding: 10px 14px;
+      border: 1px solid #d1d5db;
+      border-radius: 7px;
+      font-size: 15px;
+      font-family: system-ui, sans-serif;
+      outline: none;
+      color: #111;
+    }
+    .answer-input:focus { border-color: #9ca3af; }
+
+    .verify-btn {
+      padding: 10px 20px;
+      background: #16a34a;
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: system-ui, sans-serif;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+    .verify-btn:hover { background: #15803d; }
+
+    .verify-msg {
+      margin-top: 10px;
+      font-size: 15px;
+      min-height: 20px;
+      color: #dc2626;
+    }
+
+    /* ── Post button ── */
+    .post-btn {
+      padding: 10px 24px;
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: system-ui, sans-serif;
+      margin-top: 16px;
+      margin-bottom: 500px;
+      transition: background 0.15s;
+    }
+    .post-btn:hover { background: #1d4ed8; }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-logo">TechBanter</div>
+  <div class="nav-links">
+    <span>Home</span>
+    <span>Newsletter</span>
+  </div>
+</nav>
+
+<div class="page">
+
+  <!-- Fake article -->
+  <div class="article-meta">Mar 6, 2026 &middot; 4 min read &middot; by @null_pointer</div>
+  <h1 class="article-title">Are CAPTCHAs Getting Too Smart — Or Just Too Cruel?</h1>
+  <div class="article-body">
+    <p>Every year, security teams promise the new CAPTCHA will be "seamless" and "frictionless." Every year, you spend 40 seconds identifying fire hydrants in low-resolution thumbnails. The technology changes. The frustration does not.</p>
+    <p>The truth is, distinguishing humans from bots has become an arms race. Modern bots can now solve image puzzles with 97% accuracy. Engineers are forced to find increasingly <em>human</em> things for humans to do — things that require intuition, hesitation, and apparently, graduate-level combinatorics.</p>
+  </div>
+
+  <hr>
+
+  <!-- Fake comments -->
+  <div class="section-label">1 Comment</div>
+
+  <div class="comment">
+    <div class="avatar">T</div>
+    <div>
+      <div class="comment-meta">tobiasm_dev <span class="comment-time">2 hours ago</span></div>
+      <div class="comment-text">I once spent 26 minutes on a CAPTCHA and still failed. I started genuinely questioning my own humanity.</div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- Comment form -->
+  <div class="form-section">
+    <label class="form-label" for="comment-box">Leave a comment</label>
+    <textarea id="comment-box" placeholder="Share your thoughts..."></textarea>
+
+    <!-- Fake reCAPTCHA -->
+    <div class="rc-wrap">
+      <div class="rc-widget">
+        <div class="rc-left">
+          <div class="rc-box" id="rc-box">
+            <svg class="rc-checkmark" viewBox="0 0 16 16" fill="none">
+              <path d="M2.5 8.5L6.5 12.5L13.5 4" stroke="#4a90d9" stroke-width="2.3"
+                stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <div class="rc-spinner"></div>
+          </div>
+          <span class="rc-label" id="rc-label">I'm not a robot</span>
+        </div>
+        <div class="rc-right">
+          <div class="rc-icon">&#9749;</div>
+          <div class="rc-name">reCAPTCHA</div>
+          <div class="rc-terms">Privacy &middot; Terms</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Puzzle card (hidden until checkbox clicked) -->
+    <div class="puzzle-card" id="puzzle-card">
+      <div class="puzzle-header">
+        <div class="puzzle-title">Solve this puzzle if you are human</div>
+      </div>
+      <div class="puzzle-body">
+
+        <!-- Equation -->
+        <div class="equation-box">
+          <div class="eq-prompt">Find the exact value of:</div>
+          <div class="eq-expr">
+
+            <div class="eq-frac">
+              <div class="eq-frac-num">7!</div>
+              <div class="eq-frac-bar"></div>
+              <div class="eq-frac-den">5! &middot; 2!</div>
+            </div>
+
+            <span class="eq-op">&times; 4 &times;</span>
+
+            <div class="eq-sum-group">
+              <div class="eq-sigma-stack">
+                <span class="eq-sigma-top">&infin;</span>
+                <span class="eq-sigma-sym">&sum;</span>
+                <span class="eq-sigma-bot">n=0</span>
+              </div>
+              <div class="eq-frac">
+                <div class="eq-frac-num">(−1)<sup>n</sup></div>
+                <div class="eq-frac-bar"></div>
+                <div class="eq-frac-den">2n + 1</div>
+              </div>
+            </div>
+
+            <span class="eq-tail">+ i&sup2;</span>
+            <span class="eq-qmark">= ?</span>
+          </div>
+        </div>
+
+        <!-- Hint -->
+        <div class="calc-hint">&#8595;&nbsp; You can use this Calc</div>
+
+        <!-- Calculator -->
+        <div class="calculator">
+          <div class="calc-display" id="calc-display">0</div>
+          <div class="calc-grid">
+            <button class="calc-btn btn-clear" data-action="clear">C</button>
+            <button class="calc-btn btn-num"   data-val="(">(</button>
+            <button class="calc-btn btn-num"   data-val=")">)</button>
+            <button class="calc-btn btn-op"    data-val=" ÷ ">&divide;</button>
+
+            <button class="calc-btn btn-num"   data-val="7">7</button>
+            <button class="calc-btn btn-num"   data-val="8">8</button>
+            <button class="calc-btn btn-num"   data-val="9">9</button>
+            <button class="calc-btn btn-op"    data-val=" &times; ">&times;</button>
+
+            <button class="calc-btn btn-num"   data-val="4">4</button>
+            <button class="calc-btn btn-num"   data-val="5">5</button>
+            <button class="calc-btn btn-num"   data-val="6">6</button>
+            <button class="calc-btn btn-op"    data-val=" − ">−</button>
+
+            <button class="calc-btn btn-num"   data-val="1">1</button>
+            <button class="calc-btn btn-num"   data-val="2">2</button>
+            <button class="calc-btn btn-num"   data-val="3">3</button>
+            <button class="calc-btn btn-op"    data-val=" + ">+</button>
+
+            <button class="calc-btn btn-num span2" data-val="0">0</button>
+            <button class="calc-btn btn-num"   data-val=".">.</button>
+            <button class="calc-btn btn-eq"    data-action="equals">=</button>
+          </div>
+          <div class="calc-msg" id="calc-msg"></div>
+        </div>
+
+        <!-- Answer field -->
+        <label class="answer-label">Your answer(exact value only)</label>
+        <div class="answer-row">
+          <input type="text" class="answer-input" id="answer-input" placeholder="Enter ...">
+          <button class="verify-btn" id="verify-btn">Verify</button>
+        </div>
+        <div class="verify-msg" id="verify-msg"></div>
+
+      </div>
+    </div>
+
+    <button class="post-btn">Post comment</button>
+  </div>
+
+</div>
+
+<script>
+  // ── reCAPTCHA flow ──
+  var rcBox   = document.getElementById('rc-box');
+  var rcLabel = document.getElementById('rc-label');
+  var puzzle  = document.getElementById('puzzle-card');
+  var clicked = false;
+
+  function triggerCaptcha() {
+    if (clicked) return;
+    clicked = true;
+    rcBox.classList.add('loading');
+    rcLabel.textContent = 'Verifying...';
+    setTimeout(function() {
+      rcBox.classList.remove('loading');
+      rcBox.classList.add('checked');
+      rcLabel.textContent = 'Almost human';
+      puzzle.classList.add('open');
+      setTimeout(function() {
+        puzzle.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 80);
+    }, 1200);
+  }
+
+  rcBox.addEventListener('click', triggerCaptcha);
+  document.getElementById('rc-label').addEventListener('click', triggerCaptcha);
+
+  // ── Calculator ──
+  var display = document.getElementById('calc-display');
+  var calcMsg = document.getElementById('calc-msg');
+  var current = '0';
+  var isStart = true;
+
+  var errMsgs = [
+    'ERROR: Insufficient brain capacity',
+    'Result: undefined — as expected',
+    'OVERFLOW — have you considered a pencil?',
+    'Nice try. The answer is still 21\u03c0\u22121.',
+    'ERROR 404: Solution not found',
+    'Computing\u2026 just kidding. We cannot do infinity.',
+    'Our calculator does not support i\u00b2. Or thinking.',
+  ];
+  var errCursor = 0;
+
+  document.querySelectorAll('.calc-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var val    = btn.getAttribute('data-val');
+      var action = btn.getAttribute('data-action');
+      calcMsg.textContent = '';
+
+      if (action === 'clear') {
+        current = '0';
+        isStart = true;
+        display.textContent = '0';
+        return;
+      }
+
+      if (action === 'equals') {
+        calcMsg.textContent = errMsgs[errCursor % errMsgs.length];
+        errCursor++;
+        return;
+      }
+
+      if (val !== null) {
+        var trimmed = val.trim();
+        if (isStart && trimmed >= '0' && trimmed <= '9') {
+          current = trimmed;
+          isStart = false;
+        } else if (isStart && trimmed === '.') {
+          current = '0.';
+          isStart = false;
+        } else {
+          if (current.length < 24) current += val;
+          isStart = false;
+        }
+        display.textContent = current;
+      }
+    });
+  });
+
+  // ── Answer verification ──
+  var verifyBtn = document.getElementById('verify-btn');
+  var answerInput = document.getElementById('answer-input');
+  var verifyMsg = document.getElementById('verify-msg');
+
+  var wrongMsgs = [
+    'Not even close, you stupid bot',
+    'Wrong. The system has logged your failure.',
+    'Not even close — bots scored better, honestly.',
+    'Incorrect again. We\u2019ve alerted your high school math teacher.',
+    'Still wrong. Have you tried googling 21\u03c0\u22121?',
+    'Nope. Our servers are laughing. Internally, but still.',
+  ];
+  var wrongCursor = 0;
+
+  verifyBtn.addEventListener('click', function() {
+    var ans = answerInput.value.trim();
+    if (!ans) {
+      verifyMsg.textContent = 'Please enter something. Anything at all.';
+      return;
+    }
+    verifyMsg.textContent = wrongMsgs[wrongCursor % wrongMsgs.length];
+    wrongCursor++;
+    answerInput.value = '';
+    answerInput.focus();
+  });
+
+  answerInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') verifyBtn.click();
+  });
+</script>
+</body>
+</html>

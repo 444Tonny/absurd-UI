@@ -81,4 +81,4 @@ The visual design stays professional. The words do not have to.
 2. Must look like a real UI component at first glance
 3. Must actually output a real value
 4. Compact — no full-screen game layouts
-5. All labels and button text must be at minimum **15px** font size
+5. All text must be at minimum **15px** font size — this is a hard floor. Titles and subtitles should be even larger (18px+). The only exceptions are purely decorative/branding micro-text (e.g. fake reCAPTCHA "Privacy · Terms") that must stay small to look authentic.

@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Billing — Prism</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #f3f4f6;
+            font-family: system-ui, sans-serif;
+            min-height: 100vh;
+            color: #111827;
+            font-size: 15px;
+        }
+
+        nav {
+            background: #fff;
+            border-bottom: 1px solid #e5e7eb;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            padding: 0 24px;
+        }
+        .nav-logo { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; }
+        .nav-logo em { font-style: normal; color: #8b5cf6; }
+        .nav-links { display: flex; gap: 24px; margin-left: auto; }
+        .nav-links a { font-size: 15px; color: #6b7280; text-decoration: none; cursor: default; }
+        .nav-links a.active { color: #111827; font-weight: 500; }
+
+        .page { max-width: 520px; margin: 48px auto; padding: 0 20px; }
+
+        .breadcrumb { font-size: 15px; color: #9ca3af; margin-bottom: 20px; }
+        .breadcrumb b { color: #374151; font-weight: 500; }
+
+        /* Fake current plan */
+        .plan-card {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.04);
+            padding: 18px 24px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .plan-badge {
+            background: #8b5cf6;
+            color: #fff;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            padding: 4px 10px;
+            border-radius: 20px;
+            flex-shrink: 0;
+        }
+        .plan-name { font-size: 15px; font-weight: 600; }
+        .plan-price { font-size: 15px; color: #6b7280; margin-top: 1px; }
+        .plan-status { margin-left: auto; font-size: 15px; color: #10b981; font-weight: 500; white-space: nowrap; }
+
+        /* Cancellation card */
+        .cancel-card {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 8px 24px rgba(0,0,0,0.05);
+            padding: 32px;
+            position: relative;
+        }
+
+        .cancel-icon {
+            width: 46px; height: 46px;
+            background: #fef2f2;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 16px;
+            font-size: 20px;
+        }
+
+        .cancel-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .cancel-sub {
+            font-size: 15px;
+            color: #6b7280;
+            line-height: 1.65;
+            margin-bottom: 22px;
+        }
+        .cancel-sub strong { color: #111827; }
+
+        .lose-list {
+            list-style: none;
+            margin-bottom: 26px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .lose-list li {
+            font-size: 15px;
+            color: #374151;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            line-height: 1.5;
+        }
+        .lose-list li .x {
+            color: #ef4444;
+            font-size: 13px;
+            font-weight: 700;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .divider { height: 1px; background: #f3f4f6; margin-bottom: 24px; }
+
+        /* Button zone — keep button roams here */
+        .btn-zone {
+            position: relative;
+            height: 130px;
+        }
+
+        .btn-confirm {
+            position: absolute;
+            height: 42px;
+            padding: 0 22px;
+            background: #888;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            font-family: system-ui, sans-serif;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: left 0.13s ease-out, top 0.13s ease-out;
+            user-select: none;
+        }
+
+        .btn-keep {
+            height: 42px;
+            padding: 0 22px;
+            background: #22c55e;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            font-family: system-ui, sans-serif;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.15s;
+        }
+        .btn-keep:hover { background: #16a34a; }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 28px;
+            left: 50%;
+            transform: translateX(-50%) translateY(60px);
+            background: #111827;
+            color: #fff;
+            border-radius: 10px;
+            padding: 12px 22px;
+            font-size: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+            white-space: nowrap;
+            opacity: 0;
+            transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1), opacity 0.25s;
+            pointer-events: none;
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+    </style>
+</head>
+<body>
+
+<nav>
+    <div class="nav-logo">Pr<em>ism</em></div>
+    <div class="nav-links">
+        <a>Dashboard</a>
+        <a>Team</a>
+        <a class="active">Settings</a>
+        <a>Help</a>
+    </div>
+</nav>
+
+<div class="page">
+
+    <div class="plan-card">
+        <div class="plan-badge">Pro</div>
+        <div>
+            <div class="plan-name">Pro Plan</div>
+            <div class="plan-price">$69.99 / month</div>
+        </div>
+        <div class="plan-status">● Active</div>
+    </div>
+
+    <div class="cancel-card">
+        <div class="cancel-title">Cancel your <strong>$69.99/month</strong> subscription?</div>
+
+        <div class="divider"></div>
+
+        <div class="btn-zone">
+            <button class="btn-keep" id="keepBtn">KEEP MY PLAN (it's worth it)</button>
+            <button class="btn-confirm" id="confirmBtn">cancel</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const keepBtn   = document.getElementById('keepBtn');
+const confirmBtn = document.getElementById('confirmBtn');
+const btnZone   = document.querySelector('.btn-zone');
+const toast     = document.getElementById('toast');
+
+const FLEE_RADIUS = 110;
+const FLEE_STEP   = 85;
+
+const labels = [
+    'cancel',
+];
+
+let dodgeCount = 0;
+let confirmLeft = 0, confirmTop = 0;
+
+function initPos() {
+    const keepRect = keepBtn.getBoundingClientRect();
+    const zoneRect = btnZone.getBoundingClientRect();
+    confirmLeft = keepRect.right - zoneRect.left + 12;
+    confirmTop  = 0;
+    applyPos();
+}
+
+function applyPos() {
+    confirmBtn.style.left = confirmLeft + 'px';
+    confirmBtn.style.top  = confirmTop  + 'px';
+}
+
+function clamp() {
+    const zoneW = btnZone.offsetWidth;
+    const zoneH = btnZone.offsetHeight;
+    const btnW  = confirmBtn.offsetWidth;
+    const btnH  = confirmBtn.offsetHeight;
+    confirmLeft = Math.max(0, Math.min(zoneW - btnW, confirmLeft));
+    confirmTop  = Math.max(0, Math.min(zoneH - btnH, confirmTop));
+}
+
+function showToast(msg) {
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3500);
+}
+
+document.addEventListener('mousemove', e => {
+    const btnRect = confirmBtn.getBoundingClientRect();
+    const btnCX   = btnRect.left + btnRect.width  / 2;
+    const btnCY   = btnRect.top  + btnRect.height / 2;
+    const dx = e.clientX - btnCX;
+    const dy = e.clientY - btnCY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist > FLEE_RADIUS) return;
+
+    const prevLeft = confirmLeft;
+    const prevTop  = confirmTop;
+
+    const angle = Math.atan2(-dy, -dx);
+    confirmLeft += Math.cos(angle) * FLEE_STEP;
+    confirmTop  += Math.sin(angle) * FLEE_STEP;
+    clamp();
+
+    // Cornered — teleport to a random open spot
+    if (Math.abs(confirmLeft - prevLeft) < 2 && Math.abs(confirmTop - prevTop) < 2) {
+        const zoneW = btnZone.offsetWidth;
+        const zoneH = btnZone.offsetHeight;
+        const btnW  = confirmBtn.offsetWidth;
+        const btnH  = confirmBtn.offsetHeight;
+        confirmLeft = Math.random() * (zoneW - btnW);
+        confirmTop  = Math.random() * (zoneH - btnH);
+    }
+
+    applyPos();
+
+    dodgeCount++;
+    const label = labels[Math.min(dodgeCount, labels.length - 1)];
+    if (confirmBtn.textContent !== label) confirmBtn.textContent = label;
+});
+
+keepBtn.addEventListener('click', () => {
+    showToast('Smart choice. Your plan is safe. For now.');
+});
+
+confirmBtn.addEventListener('click', () => {
+    showToast("Subscription cancelled. We've noted your betrayal.");
+});
+
+window.addEventListener('load', initPos);
+</script>
+</body>
+</html>

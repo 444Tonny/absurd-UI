@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Verify Phone — Axiom</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #f3f4f6;
+            font-family: system-ui, sans-serif;
+            min-height: 100vh;
+            color: #111827;
+        }
+
+        nav {
+            background: #fff;
+            border-bottom: 1px solid #e5e7eb;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            padding: 0 24px;
+        }
+        .nav-logo { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; }
+        .nav-logo em { font-style: normal; color: #6366f1; }
+        .nav-links { display: flex; gap: 24px; margin-left: auto; }
+        .nav-links a { font-size: 15px; color: #6b7280; text-decoration: none; cursor: default; }
+        .nav-links a.active { color: #111827; font-weight: 500; }
+
+        .page {
+            max-width: 400px;
+            margin: 48px auto;
+            padding: 0 20px;
+        }
+
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 8px 24px rgba(0,0,0,0.04);
+            padding: 24px 24px 20px;
+        }
+
+        .card-title {
+            font-size: 20px;
+            font-weight: 500;
+            text-align: center;
+            margin-bottom: 16px;
+        }
+
+        .num-display {
+            font-size: 22px;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-align: center;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 10px 14px;
+            margin-bottom: 16px;
+            font-variant-numeric: tabular-nums;
+            color: #111827;
+            transition: border-color 0.2s;
+        }
+        .num-display.flash { border-color: #6366f1; }
+
+        canvas { display: block; margin: 0 auto; }
+
+        .card-footer { display: flex; justify-content: flex-end; margin-top: 10px; }
+        .reset-link { font-size: 15px; color: #d1d5db; cursor: default; transition: color 0.15s; }
+        .reset-link.on { color: #9ca3af; cursor: pointer; }
+        .reset-link.on:hover { color: #374151; }
+
+        .toast {
+            position: fixed;
+            bottom: 28px;
+            left: 50%;
+            transform: translateX(-50%) translateY(60px);
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 12px 22px;
+            font-size: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+            white-space: nowrap;
+            opacity: 0;
+            transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1), opacity 0.25s;
+            pointer-events: none;
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+    </style>
+</head>
+<body>
+
+<nav>
+    <div class="nav-logo">Ax<em>iom</em></div>
+    <div class="nav-links">
+        <a>Help</a>
+    </div>
+</nav>
+
+<div class="page">
+    <div class="card">
+        <div class="card-title">Enter your phone number</div>
+        <div class="num-display" id="numDisplay">+1 (___) ___-____</div>
+        <canvas id="dial" width="300" height="380"></canvas>
+        <div class="card-footer">
+            <div class="reset-link" id="resetBtn">Reset</div>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast">Félicitations, we think. Your number has been… noted.</div>
+
+<script>
+const canvas     = document.getElementById('dial');
+const ctx        = canvas.getContext('2d');
+const numDisplay = document.getElementById('numDisplay');
+const resetBtn   = document.getElementById('resetBtn');
+const toast      = document.getElementById('toast');
+
+const W = 300, H = 380;
+const CX = 150, CY = 220;
+const DISC_R   = 95;
+const HOLE_R   = 66;
+const HOLE_RAD = 13;
+const CENTER_R = 23;
+const STOP_DEG = 55;
+
+const BODY_X = 25, BODY_Y = 52, BODY_W = 250, BODY_H = 318, BODY_R = 16;
+
+const HOLE_DIGITS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
+const HOLE_DEGS   = HOLE_DIGITS.map((_, i) => ((STOP_DEG - (i + 1) * 30) + 720) % 360);
+
+let digits      = [];
+let dialRot     = 0;
+let dragging    = false;
+let dragHoleIdx = -1;
+let maxRot      = 0;
+let prevAngle   = 0;
+let accRot      = 0;
+let hoveredHole = -1;
+let animId      = null;
+let registered  = false;
+
+function degToRad(d) { return d * Math.PI / 180; }
+
+function mouseAngle(e) {
+    const r = canvas.getBoundingClientRect();
+    const x = (e.clientX - r.left) * (W / r.width)  - CX;
+    const y = (e.clientY - r.top)  * (H / r.height) - CY;
+    return Math.atan2(y, x) * 180 / Math.PI;
+}
+
+function holeCenter(idx, rot) {
+    const a = degToRad(HOLE_DEGS[idx] + rot);
+    return { x: CX + HOLE_R * Math.cos(a), y: CY + HOLE_R * Math.sin(a) };
+}
+
+function hitHole(mx, my, rot) {
+    for (let i = 0; i < 10; i++) {
+        const c  = holeCenter(i, rot);
+        const dx = mx - c.x, dy = my - c.y;
+        if (Math.sqrt(dx*dx + dy*dy) < HOLE_RAD + 5) return i;
+    }
+    return -1;
+}
+
+function drawPhoneBody() {
+    // Shadow
+    ctx.shadowColor = 'rgba(0,0,0,0.32)';
+    ctx.shadowBlur  = 28;
+    ctx.shadowOffsetY = 10;
+    ctx.beginPath();
+    ctx.roundRect(BODY_X, BODY_Y, BODY_W, BODY_H, BODY_R);
+    ctx.fillStyle = '#374151';
+    ctx.fill();
+    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+
+    // Border
+    ctx.beginPath();
+    ctx.roundRect(BODY_X, BODY_Y, BODY_W, BODY_H, BODY_R);
+    ctx.strokeStyle = '#4b5563';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Top strip (cradle area)
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(BODY_X, BODY_Y, BODY_W, 36, [BODY_R, BODY_R, 0, 0]);
+    ctx.clip();
+    ctx.fillStyle = '#4b5563';
+    ctx.fillRect(BODY_X, BODY_Y, BODY_W, 36);
+    ctx.restore();
+
+    // Dial recess
+    ctx.beginPath();
+    ctx.arc(CX, CY, DISC_R + 11, 0, Math.PI * 2);
+    ctx.fillStyle = '#1f2937';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(CX, CY, DISC_R + 7, 0, Math.PI * 2);
+    ctx.strokeStyle = '#2d3748';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Nameplate (no text)
+    ctx.beginPath();
+    ctx.roundRect(CX - 30, BODY_Y + 12, 60, 14, 3);
+    ctx.fillStyle = '#2d3748';
+    ctx.fill();
+
+    // Speaker vents below dial
+    const ventY = BODY_Y + BODY_H - 34;
+    for (let i = 0; i < 7; i++) {
+        ctx.beginPath();
+        ctx.ellipse(CX - 45 + i * 15, ventY, 3.5, 5.5, 0, 0, Math.PI * 2);
+        ctx.fillStyle = '#1f2937';
+        ctx.fill();
+    }
+
+    // Cord stub at bottom
+    ctx.beginPath();
+    ctx.roundRect(CX - 8, BODY_Y + BODY_H - 8, 16, 12, [0, 0, 6, 6]);
+    ctx.fillStyle = '#2d3748';
+    ctx.fill();
+}
+
+function drawDial(rot, hov) {
+    ctx.save();
+    ctx.translate(CX, CY);
+    ctx.rotate(degToRad(rot));
+    ctx.translate(-CX, -CY);
+
+    ctx.shadowColor = 'rgba(0,0,0,0.22)';
+    ctx.shadowBlur  = 10;
+    ctx.beginPath();
+    ctx.arc(CX, CY, DISC_R, 0, Math.PI * 2);
+    ctx.fillStyle = '#e5e7eb';
+    ctx.fill();
+    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+
+    ctx.beginPath();
+    ctx.arc(CX, CY, DISC_R, 0, Math.PI * 2);
+    ctx.strokeStyle = '#d1d5db';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(CX, CY, HOLE_R + HOLE_RAD + 5, 0, Math.PI * 2);
+    ctx.fillStyle = '#f3f4f6';
+    ctx.fill();
+
+    for (let i = 0; i < 10; i++) {
+        const c = holeCenter(i, 0);
+        const isHov = hov === i && rot === 0;
+
+        if (isHov) {
+            ctx.beginPath();
+            ctx.arc(c.x, c.y, HOLE_RAD + 4, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(99,102,241,0.15)';
+            ctx.fill();
+        }
+
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, HOLE_RAD, 0, Math.PI * 2);
+        ctx.fillStyle = isHov ? '#1e1b4b' : '#1f2937';
+        ctx.fill();
+
+        ctx.fillStyle = '#f9fafb';
+        ctx.font = 'bold 13px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(String(HOLE_DIGITS[i]), c.x, c.y);
+    }
+
+    // Center cap (no text)
+    ctx.beginPath();
+    ctx.arc(CX, CY, CENTER_R, 0, Math.PI * 2);
+    ctx.fillStyle = '#d1d5db';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(CX, CY, CENTER_R - 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#e5e7eb';
+    ctx.fill();
+
+    ctx.restore();
+}
+
+function drawStopPeg() {
+    const stopRad = degToRad(STOP_DEG);
+    const spx = CX + (DISC_R - 7) * Math.cos(stopRad);
+    const spy = CY + (DISC_R - 7) * Math.sin(stopRad);
+    ctx.beginPath();
+    ctx.arc(spx, spy, 6, 0, Math.PI * 2);
+    ctx.fillStyle = '#374151';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(spx, spy, 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#6b7280';
+    ctx.fill();
+}
+
+function draw(rot, hov) {
+    ctx.clearRect(0, 0, W, H);
+    drawPhoneBody();
+    drawDial(rot, hov);
+    drawStopPeg();
+}
+
+function updateDisplay(flash) {
+    const s = Array(10).fill('_');
+    digits.forEach((d, i) => { s[i] = d; });
+    numDisplay.textContent = `+1 (${s.slice(0,3).join('')}) ${s.slice(3,6).join('')}-${s.slice(6,10).join('')}`;
+    resetBtn.classList.toggle('on', digits.length > 0);
+    if (flash) {
+        numDisplay.classList.add('flash');
+        setTimeout(() => numDisplay.classList.remove('flash'), 300);
+    }
+}
+
+function springBack() {
+    cancelAnimationFrame(animId);
+    let cur = dialRot;
+    function step() {
+        cur += (0 - cur) * 0.045;
+        if (Math.abs(cur) < 0.3) {
+            dialRot = 0;
+            draw(0, hoveredHole);
+            return;
+        }
+        dialRot = cur;
+        draw(dialRot, -1);
+        animId = requestAnimationFrame(step);
+    }
+    animId = requestAnimationFrame(step);
+}
+
+canvas.addEventListener('mousedown', e => {
+    if (digits.length >= 10) return;
+    e.preventDefault();
+    cancelAnimationFrame(animId);
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * (W / rect.width);
+    const my = (e.clientY - rect.top)  * (H / rect.height);
+    const hi = hitHole(mx, my, 0);
+    if (hi === -1) return;
+    dragging    = true;
+    dragHoleIdx = hi;
+    prevAngle   = mouseAngle(e);
+    accRot      = 0;
+    maxRot      = (STOP_DEG - HOLE_DEGS[hi] + 360) % 360;
+    registered  = false;
+    canvas.style.cursor = 'grabbing';
+});
+
+document.addEventListener('mousemove', e => {
+    if (!dragging) {
+        const rect = canvas.getBoundingClientRect();
+        const mx = (e.clientX - rect.left) * (W / rect.width);
+        const my = (e.clientY - rect.top)  * (H / rect.height);
+        const hi = hitHole(mx, my, 0);
+        if (hi !== hoveredHole) {
+            hoveredHole = hi;
+            if (dialRot === 0) draw(0, hoveredHole);
+            canvas.style.cursor = hi === -1 ? 'default' : 'grab';
+        }
+        return;
+    }
+
+    const cur = mouseAngle(e);
+    let delta  = cur - prevAngle;
+    if (delta >  180) delta -= 360;
+    if (delta < -180) delta += 360;
+    prevAngle = cur;
+
+    accRot  = Math.max(0, Math.min(accRot + delta, maxRot));
+    dialRot = accRot;
+    draw(dialRot, -1);
+});
+
+document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    canvas.style.cursor = hoveredHole !== -1 ? 'grab' : 'default';
+
+    if (accRot >= maxRot * 0.85 && !registered && digits.length < 10) {
+        registered = true;
+        digits.push(HOLE_DIGITS[dragHoleIdx]);
+        updateDisplay(true);
+        if (digits.length === 10) {
+            setTimeout(() => {
+                toast.classList.add('show');
+                setTimeout(() => toast.classList.remove('show'), 4000);
+            }, 500);
+        }
+    }
+    springBack();
+});
+
+canvas.addEventListener('mouseleave', () => {
+    if (!dragging) {
+        hoveredHole = -1;
+        if (dialRot === 0) draw(0, -1);
+        canvas.style.cursor = 'default';
+    }
+});
+
+resetBtn.addEventListener('click', () => {
+    if (!resetBtn.classList.contains('on')) return;
+    digits = [];
+    updateDisplay(false);
+});
+
+draw(0, -1);
+updateDisplay(false);
+</script>
+</body>
+</html>

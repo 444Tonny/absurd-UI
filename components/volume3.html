@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>UI UX Tutorial</title>
+    <style>
+        :root { --red: #ef4444; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #f3f4f6;
+            color: #111827;
+            font-family: system-ui, sans-serif;
+            font-size: 15px;
+        }
+
+        /* ── Nav ── */
+        nav {
+            position: sticky; top: 0; z-index: 100;
+            background: #fff;
+            border-bottom: 1px solid #e5e7eb;
+            height: 56px;
+            display: flex; align-items: center;
+            padding: 0 20px; gap: 16px;
+        }
+        .nav-logo { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; white-space: nowrap; }
+        .nav-logo span { color: var(--red); }
+        .nav-search { flex: 1; max-width: 440px; margin: 0 auto; display: flex; }
+        .nav-search input {
+            flex: 1;
+            background: #f9fafb; border: 1px solid #d1d5db; border-right: none;
+            border-radius: 20px 0 0 20px; padding: 7px 16px;
+            color: #111827; font-size: 15px; outline: none;
+        }
+        .nav-search button {
+            background: #f3f4f6; border: 1px solid #d1d5db; border-left: none;
+            border-radius: 0 20px 20px 0; padding: 0 14px;
+            color: #6b7280; cursor: pointer; font-size: 15px;
+        }
+        .nav-avatar {
+            width: 32px; height: 32px; border-radius: 50%; margin-left: auto;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 15px; font-weight: 600; color: #fff; flex-shrink: 0;
+        }
+
+        /* ── Layout ── */
+        .layout {
+            max-width: 1200px; margin: 0 auto;
+            padding: 20px 24px;
+            display: grid;
+            grid-template-columns: 1fr 340px;
+            gap: 24px;
+        }
+
+        /* ── Player ── */
+        .player-wrap {
+            position: relative;
+            background: #000;
+            border-radius: 10px;
+            aspect-ratio: 16/9;
+            margin-bottom: 14px;
+            overflow: visible;
+        }
+        .screen {
+            position: absolute; inset: 0;
+            border-radius: 10px; overflow: hidden;
+            background: linear-gradient(160deg, #1a1a2e 0%, #16213e 45%, #0f3460 100%);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .waveform { display: flex; gap: 3px; align-items: center; height: 56px; }
+        .wave-bar {
+            width: 3px; border-radius: 2px;
+            background: rgba(255,255,255,0.12);
+            animation: wave var(--dur) ease-in-out infinite alternate;
+            animation-delay: var(--delay);
+            height: var(--min);
+        }
+        @keyframes wave { to { height: var(--max); } }
+
+        /* Controls */
+        .controls {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            background: linear-gradient(transparent, rgba(0,0,0,0.88));
+            padding: 28px 14px 10px;
+            border-radius: 0 0 10px 10px;
+            display: flex; flex-direction: column; gap: 7px;
+            overflow: visible;
+        }
+        .progress-wrap {
+            height: 3px; background: rgba(255,255,255,0.2);
+            border-radius: 2px; cursor: pointer; position: relative;
+        }
+        .progress-fill {
+            height: 100%; width: 36%; background: var(--red);
+            border-radius: 2px; position: relative;
+        }
+        .progress-fill::after {
+            content: ''; position: absolute; right: -5px; top: 50%;
+            transform: translateY(-50%);
+            width: 10px; height: 10px; background: #fff; border-radius: 50%;
+        }
+        .ctrl-row { display: flex; align-items: center; gap: 4px; overflow: visible; }
+        .ctrl-btn {
+            background: none; border: none; color: #fff;
+            padding: 5px 6px; border-radius: 4px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: background 0.1s;
+        }
+        .ctrl-btn:hover { background: rgba(255,255,255,0.1); }
+        .ctrl-btn svg { width: 20px; height: 20px; fill: currentColor; display: block; }
+        .time-disp { font-size: 15px; color: #ccc; white-space: nowrap; padding: 0 6px; }
+        .spacer { flex: 1; }
+
+        /* Volume popup */
+        .vol-wrap { position: relative; }
+        .vol-popup {
+            position: absolute;
+            bottom: calc(100% + 14px);
+            left: 50%; transform: translateX(-50%);
+            background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+            padding: 14px 16px 12px;
+            width: 200px;
+            z-index: 200;
+            display: none;
+        }
+        .vol-popup::after {
+            content: ''; position: absolute;
+            bottom: -5px; left: 50%; transform: translateX(-50%) rotate(45deg);
+            width: 10px; height: 10px; background: #fff;
+            border-right: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb;
+            border-radius: 2px;
+        }
+        .popup-label {
+            font-size: 15px; font-weight: 500; color: #111827;
+            text-align: center; margin-bottom: 10px;
+            line-height: 1.3;
+        }
+
+        /* Checkbox list */
+        .checkbox-list {
+            max-height: 260px;
+            overflow-y: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #f9fafb;
+        }
+        .checkbox-list::-webkit-scrollbar { width: 5px; }
+        .checkbox-list::-webkit-scrollbar-track { background: transparent; }
+        .checkbox-list::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+        .checkbox-item {
+            display: flex; align-items: center; gap: 8px;
+            padding: 4px 10px;
+            cursor: pointer;
+            transition: background 0.08s;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .checkbox-item:last-child { border-bottom: none; }
+        .checkbox-item:hover { background: #f3f4f6; }
+        .checkbox-item.selected { background: #fef2f2; }
+        .checkbox-item input[type="checkbox"] {
+            width: 14px; height: 14px;
+            cursor: pointer; flex-shrink: 0;
+            accent-color: var(--red);
+        }
+        .checkbox-item label {
+            font-size: 15px; color: #374151; cursor: pointer; user-select: none;
+        }
+        .checkbox-item.selected label { color: var(--red); font-weight: 600; }
+
+        .popup-footer {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-top: 10px;
+        }
+        .popup-value { font-size: 15px; color: #6b7280; }
+        .popup-value span { font-weight: 600; color: #111827; font-size: 15px; }
+        .popup-reset { font-size: 15px; color: #d1d5db; cursor: default; transition: color 0.15s; }
+        .popup-reset.active { color: #9ca3af; cursor: pointer; }
+        .popup-reset.active:hover { color: #111827; }
+
+        /* ── Video info ── */
+        .video-title {
+            font-size: 18px; font-weight: 600; line-height: 1.4; margin-bottom: 10px;
+            color: #111827;
+        }
+        .video-meta {
+            display: flex; justify-content: space-between; align-items: center;
+            padding-bottom: 12px; border-bottom: 1px solid #e5e7eb; margin-bottom: 14px;
+        }
+        .video-stats { font-size: 15px; color: #6b7280; }
+        .action-btns { display: flex; gap: 8px; }
+        .action-btn {
+            display: flex; align-items: center; gap: 6px;
+            background: #f3f4f6; border: none; color: #111827;
+            padding: 8px 14px; border-radius: 20px;
+            font-size: 15px; font-family: system-ui; cursor: pointer;
+        }
+        .action-btn:hover { background: #e5e7eb; }
+        .channel-row {
+            display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+        }
+        .channel-avatar {
+            width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
+            background: linear-gradient(135deg, #f59e0b, #ef4444);
+        }
+        .channel-name { font-size: 15px; font-weight: 500; color: #111827; }
+        .channel-subs { font-size: 15px; color: #6b7280; margin-top: 2px; }
+        .subscribe-btn {
+            margin-left: auto; background: #111827; color: #fff; border: none;
+            padding: 9px 18px; border-radius: 20px; font-size: 15px;
+            font-weight: 600; font-family: system-ui; cursor: pointer;
+        }
+        .description {
+            background: #f3f4f6; border-radius: 8px; padding: 12px 14px;
+            font-size: 15px; color: #6b7280; line-height: 1.6; margin-bottom: 24px;
+        }
+        .description strong { color: #111827; }
+
+        /* ── Comments ── */
+        .comments-header { font-size: 18px; font-weight: 600; margin-bottom: 16px; color: #111827; }
+        .comment { display: flex; gap: 12px; margin-bottom: 20px; }
+        .comment-avatar { width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; }
+        .comment-name { font-size: 15px; font-weight: 500; color: #111827; }
+        .comment-date { font-size: 15px; color: #9ca3af; margin-left: 8px; }
+        .comment-text { font-size: 15px; color: #374151; margin-top: 4px; line-height: 1.5; }
+        .comment-likes { font-size: 15px; color: #9ca3af; margin-top: 6px; }
+
+        /* ── Sidebar ── */
+        aside { display: flex; flex-direction: column; gap: 10px; padding-top: 4px; }
+        .sug-card { display: flex; gap: 8px; cursor: pointer; }
+        .sug-thumb { width: 160px; height: 90px; border-radius: 6px; flex-shrink: 0; }
+        .sug-title {
+            font-size: 15px; font-weight: 500; color: #374151; line-height: 1.4; margin-bottom: 4px;
+        }
+        .sug-card:hover .sug-title { color: #111827; }
+        .sug-sub { font-size: 15px; color: #9ca3af; }
+    </style>
+</head>
+<body>
+
+<nav>
+    <div class="nav-logo">Watch<span>r</span></div>
+    <div class="nav-search">
+        <input type="text" value="lo fi chill beats 2 hours">
+        <button>🔍</button>
+    </div>
+    <div class="nav-avatar">A</div>
+</nav>
+
+<div class="layout">
+<main>
+
+    <!-- Player -->
+    <div class="player-wrap">
+        <div class="screen">
+            <div class="waveform" id="waveform"></div>
+        </div>
+        <div class="controls">
+            <div class="progress-wrap"><div class="progress-fill"></div></div>
+            <div class="ctrl-row">
+                <button class="ctrl-btn">
+                    <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                </button>
+                <button class="ctrl-btn">
+                    <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6h2v12h-2z"/></svg>
+                </button>
+
+                <!-- Volume button + popup -->
+                <div class="vol-wrap">
+                    <button class="ctrl-btn" id="volBtn">
+                        <svg id="volIcon" viewBox="0 0 24 24">
+                            <path id="volPath" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
+                        </svg>
+                    </button>
+                    <div class="vol-popup" id="volPopup">
+                        <div class="popup-label">CHOOSE YOUR VOLUME...</div>
+                        <div class="checkbox-list" id="checkboxList"></div>
+                        <div class="popup-footer">
+                            <div class="popup-value">Vol: <span id="volNum">0%</span></div>
+                            <div class="popup-reset" id="resetBtn">Reset</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="time-disp">4:32 / 2:07:44</div>
+                <div class="spacer"></div>
+                <button class="ctrl-btn">
+                    <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.03 7.03 0 0 0-1.62-.94l-.36-2.54A.484.484 0 0 0 14 2h-4a.484.484 0 0 0-.48.41l-.36 2.54a7.03 7.03 0 0 0-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.64 8.47a.48.48 0 0 0 .12.61l2.03 1.58a7.18 7.18 0 0 0-.07.94c0 .33.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32a.49.49 0 0 0 .59.22l2.39-.96c.5.36 1.04.67 1.62.94l.36 2.54c.05.24.27.41.48.41h4c.21 0 .43-.17.48-.41l.36-2.54a7.03 7.03 0 0 0 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+                </button>
+                <button class="ctrl-btn">
+                    <svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Video info -->
+    <h1 class="video-title">TUTORIAL - Web design course for complete newbies who don't know anything about computers</h1>
+    <div class="video-meta">
+        <div class="video-stats">2.4M views &nbsp;·&nbsp; Mar 14, 2024</div>
+        <div class="action-btns">
+            <button class="action-btn">&nbsp;142K</button>
+            <button class="action-btn">Share</button>
+            <button class="action-btn">Save</button>
+        </div>
+    </div>
+    <div class="channel-row">
+        <div class="channel-avatar"></div>
+        <div>
+            <div class="channel-name">UI UX hacker</div>
+            <div class="channel-subs">1.2M subscribers</div>
+        </div>
+        <button class="subscribe-btn">Subscribe</button>
+    </div>
+    <div class="description">
+        <strong>No prior knowledge required.</strong> We start from absolute zero — lesson 1 is "what is a mouse".<br><br>
+        By the end of this course you will know how to open a browser, close a browser, and question every career choice you've ever made.
+        If you've ever asked someone to "make the font more round", this course is for you.
+    </div>
+
+    <!-- Comments -->
+    <div class="comments-header">87,412 Comments</div>
+
+    <div class="comment">
+        <div class="comment-avatar" style="background:linear-gradient(135deg,#10b981,#3b82f6)"></div>
+        <div>
+            <span class="comment-name">@just_vibing_here</span>
+            <span class="comment-date">3 months ago</span>
+            <div class="comment-text">tried to adjust the volume. took me 18 tries. worth it.</div>
+            <div class="comment-likes">👍 21.1K &nbsp;·&nbsp; Reply</div>
+        </div>
+    </div>
+    <div class="comment">
+        <div class="comment-avatar" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)"></div>
+        <div>
+            <span class="comment-name">@quietstudier</span>
+            <span class="comment-date">2 weeks ago</span>
+            <div class="comment-text">I've been using this playlist for 3 years. My GPA went from 3.8 to 1.4. Coincidence? I think not.</div>
+            <div class="comment-likes">👍 14.2K &nbsp;·&nbsp; Reply</div>
+        </div>
+    </div>
+    <div class="comment">
+        <div class="comment-avatar" style="background:linear-gradient(135deg,#f59e0b,#ef4444)"></div>
+        <div>
+            <span class="comment-name">@nightowlcoder</span>
+            <span class="comment-date">1 month ago</span>
+            <div class="comment-text">3am, 400 lines of code deep, and a chaotic headache after watching this</div>
+            <div class="comment-likes">👍 8.7K &nbsp;·&nbsp; Reply</div>
+        </div>
+    </div>
+
+</main>
+
+<!-- Sidebar -->
+<aside>
+    <div class="sug-card">
+        <div class="sug-thumb" style="background:linear-gradient(135deg,#1a1a2e,#0f3460)"></div>
+        <div><div class="sug-title">How to turn it off and on again — Advanced IT Troubleshooting (3hr Masterclass)</div><div class="sug-sub">HelpDesk Hero · 4.1M views</div></div>
+    </div>
+    <div class="sug-card">
+        <div class="sug-thumb" style="background:linear-gradient(135deg,#2d1b69,#11998e)"></div>
+        <div><div class="sug-title">I spent 6 hours debugging. The error was a missing semicolon.</div><div class="sug-sub">SeniorDevCrying · 2.8M views</div></div>
+    </div>
+    <div class="sug-card">
+        <div class="sug-thumb" style="background:linear-gradient(135deg,#7f1d1d,#b91c1c)"></div>
+        <div><div class="sug-title">CSS is NOT that hard (10-hour documentary)</div><div class="sug-sub">FrontendSuffering · 6.3M views</div></div>
+    </div>
+    <div class="sug-card">
+        <div class="sug-thumb" style="background:linear-gradient(135deg,#4facfe,#00f2fe)"></div>
+        <div><div class="sug-title">Git for beginners — Episode 1: Why did I delete the main branch</div><div class="sug-sub">VersionControlVictim · 1.9M views</div></div>
+    </div>
+    <div class="sug-card">
+        <div class="sug-thumb" style="background:linear-gradient(135deg,#f7971e,#ffd200)"></div>
+        <div><div class="sug-title">My boss asked me to "just add a button" — a 47-file diff story</div><div class="sug-sub">FullStackTrauma · 3.5M views</div></div>
+    </div>
+    <div class="sug-card">
+        <div class="sug-thumb" style="background:linear-gradient(135deg,#a18cd1,#fbc2eb)"></div>
+        <div><div class="sug-title">JavaScript: The Good Parts (42 seconds video)</div><div class="sug-sub">Brendan Eich Official · 12M views</div></div>
+    </div>
+</aside>
+</div>
+
+<script>
+// ── Waveform ──────────────────────────────────────────
+const wf = document.getElementById('waveform');
+for (let i = 0; i < 52; i++) {
+    const b = document.createElement('div');
+    b.className = 'wave-bar';
+    b.style.setProperty('--min', (4  + Math.random() * 8).toFixed(0)  + 'px');
+    b.style.setProperty('--max', (18 + Math.random() * 36).toFixed(0) + 'px');
+    b.style.setProperty('--dur', (0.7 + Math.random() * 1.3).toFixed(2) + 's');
+    b.style.setProperty('--delay', (Math.random() * 1.5).toFixed(2) + 's');
+    wf.appendChild(b);
+}
+
+// ── Popup toggle ──────────────────────────────────────
+const volBtn   = document.getElementById('volBtn');
+const volPopup = document.getElementById('volPopup');
+
+volBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    volPopup.style.display = volPopup.style.display === 'block' ? 'none' : 'block';
+});
+document.addEventListener('click', e => {
+    if (!volPopup.contains(e.target) && e.target !== volBtn)
+        volPopup.style.display = 'none';
+});
+
+// ── Checkbox list ─────────────────────────────────────
+const checkboxList = document.getElementById('checkboxList');
+const volEl        = document.getElementById('volNum');
+const resetBtn     = document.getElementById('resetBtn');
+const volPath      = document.getElementById('volPath');
+
+let volume = 0;
+let checkboxes = [];
+
+// Build 101 checkboxes (0% → 100%)
+for (let i = 0; i <= 100; i++) {
+    const item = document.createElement('div');
+    item.className = 'checkbox-item' + (i === 0 ? ' selected' : '');
+
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.id = 'vol_' + i;
+    cb.checked = (i === 0);
+
+    const lbl = document.createElement('label');
+    lbl.htmlFor = 'vol_' + i;
+    lbl.textContent = i + '%';
+
+    item.appendChild(cb);
+    item.appendChild(lbl);
+    checkboxList.appendChild(item);
+    checkboxes.push({ item, cb, value: i });
+
+    item.addEventListener('click', e => {
+        e.stopPropagation();
+        setVolume(i);
+    });
+}
+
+function setVolume(v) {
+    volume = v;
+
+    checkboxes.forEach(({ item, cb, value }) => {
+        const sel = value === v;
+        cb.checked = sel;
+        item.classList.toggle('selected', sel);
+    });
+
+    volEl.textContent = v + '%';
+    resetBtn.classList.toggle('active', v !== 0);
+
+    if (v === 0)
+        volPath.setAttribute('d', 'M16.5 12A4.5 4.5 0 0 0 14 7.97v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.796 8.796 0 0 0 21 12c0-4.28-3-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06A8.99 8.99 0 0 0 17.73 18l2 2L21 18.73 4.27 3zM12 4 9.91 6.09 12 8.18V4z');
+    else if (v < 50)
+        volPath.setAttribute('d', 'M18.5 12A4.5 4.5 0 0 0 16 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z');
+    else
+        volPath.setAttribute('d', 'M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77 0-4.28-2.99-7.86-7-8.77z');
+
+    // Scroll selected item into view
+    const selectedItem = checkboxes[v].item;
+    selectedItem.scrollIntoView({ block: 'nearest' });
+}
+
+resetBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    if (!resetBtn.classList.contains('active')) return;
+    setVolume(0);
+    checkboxList.scrollTop = 0;
+});
+</script>
+
+</body>
+</html>
