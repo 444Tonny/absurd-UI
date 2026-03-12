@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CustomerPulse — Survey</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #f3f4f6;
+            color: #111827;
+            font-family: system-ui, -apple-system, sans-serif;
+            font-size: 15px;
+            min-height: 100vh;
+        }
+
+        /* ── Nav ── */
+        nav {
+            background: #fff; border-bottom: 1px solid #e5e7eb;
+            height: 56px; display: flex; align-items: center;
+            padding: 0 28px; gap: 12px; position: sticky; top: 0; z-index: 5;
+        }
+        .nav-dot { width: 10px; height: 10px; border-radius: 50%; background: #6366f1; }
+        .nav-logo { font-size: 17px; font-weight: 700; color: #111827; }
+        .nav-logo span { color: #6366f1; }
+        .nav-badge {
+            margin-left: auto; background: #f3f4f6; border: 1px solid #e5e7eb;
+            border-radius: 20px; padding: 4px 12px; font-size: 15px; color: #6b7280;
+        }
+
+        /* ── Layout ── */
+        .container {
+            max-width: 560px; margin: 56px auto;
+            padding: 0 16px 80px;
+        }
+        .progress-label {
+            font-size: 15px; color: #9ca3af; margin-bottom: 12px; text-align: center;
+        }
+        .progress-bar {
+            height: 4px; background: #e5e7eb; border-radius: 2px; margin-bottom: 36px;
+        }
+        .progress-fill { height: 100%; width: 100%; background: #6366f1; border-radius: 2px; }
+
+        /* ── Survey card (the component) ── */
+        .survey-card {
+            background: #fff; border-radius: 14px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+            padding: 28px 24px 20px;
+        }
+        .card-question {
+            font-size: 18px; font-weight: 600; color: #111827;
+            text-align: center; margin-bottom: 6px; line-height: 1.4;
+        }
+        .card-hint {
+            font-size: 15px; color: #9ca3af; text-align: center; margin-bottom: 22px;
+        }
+
+        /* ── Choice buttons ── */
+        .choices {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+            margin-bottom: 16px;
+        }
+        .choice-btn {
+            border: 2px solid #e5e7eb; border-radius: 10px;
+            padding: 14px 12px; background: #fff;
+            cursor: pointer; text-align: center;
+            transition: border-color 0.1s, background 0.1s, transform 0.06s;
+            user-select: none; position: relative; overflow: hidden;
+        }
+        .choice-btn:active { transform: scale(0.97); }
+        .choice-btn .choice-label {
+            font-size: 20px; font-weight: 700; display: block; margin-bottom: 4px;
+        }
+        .choice-btn .choice-count {
+            font-size: 15px; color: #9ca3af;
+        }
+        .choice-btn.yes-btn:hover { border-color: #a5b4fc; background: #f5f3ff; }
+        .choice-btn.no-btn:hover  { border-color: #fca5a5; background: #fff5f5; }
+
+        /* Decided states */
+        .choice-btn.winner-yes { border-color: #6366f1; background: #eef2ff; }
+        .choice-btn.winner-no  { border-color: #ef4444; background: #fef2f2; }
+        .choice-btn.loser { opacity: 0.35; pointer-events: none; }
+        .choice-btn.disabled { pointer-events: none; }
+
+        /* Click pulse */
+        .choice-btn::after {
+            content: '';
+            position: absolute; inset: 0;
+            background: rgba(99,102,241,0.15);
+            opacity: 0; border-radius: 8px;
+            pointer-events: none;
+        }
+        .no-btn::after { background: rgba(239,68,68,0.15); }
+        @keyframes pulse { 0%{opacity:1} 100%{opacity:0} }
+        .choice-btn.pulsing::after { animation: pulse 0.25s ease-out forwards; }
+
+        /* ── Canvas ── */
+        #balanceCanvas {
+            display: block; width: 100%;
+            background: #f9fafb;
+            border-radius: 10px;
+            border: 1px solid #e5e7eb;
+        }
+
+        /* ── Footer ── */
+        .card-footer {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-top: 12px;
+        }
+        .footer-answer { font-size: 15px; color: #6b7280; }
+        .footer-answer strong { font-size: 17px; color: #111827; font-weight: 700; }
+        .footer-reset {
+            font-size: 15px; color: #d1d5db; cursor: default; transition: color 0.15s;
+        }
+        .footer-reset.active { color: #9ca3af; cursor: pointer; }
+        .footer-reset.active:hover { color: #374151; }
+
+        /* ── Fake footer stuff ── */
+        .survey-footer {
+            text-align: center; margin-top: 28px;
+            font-size: 15px; color: #9ca3af;
+        }
+        .powered { margin-top: 8px; font-size: 13px; color: #d1d5db; }
+    </style>
+</head>
+<body>
+
+<nav>
+    <div class="nav-dot"></div>
+    <div class="nav-logo">Customer<span>Pulse</span></div>
+    <div class="nav-badge">1 question</div>
+</nav>
+
+<div class="container">
+    <div class="progress-label">Question 1 of 1</div>
+    <div class="progress-bar"><div class="progress-fill"></div></div>
+
+    <div class="survey-card">
+        <div class="card-question">Would you recommend us to a friend?</div>
+        <div class="card-hint">Weigh your answer carefully. Very carefully.</div>
+
+        <div class="choices">
+            <button class="choice-btn yes-btn" id="yesBtn" onclick="addWeight('yes')">
+                <span class="choice-label">YES</span>
+                <span class="choice-count" id="yesCount">0 weights</span>
+            </button>
+            <button class="choice-btn no-btn" id="noBtn" onclick="addWeight('no')">
+                <span class="choice-label">NO</span>
+                <span class="choice-count" id="noCount">0 weights</span>
+            </button>
+        </div>
+
+        <canvas id="balanceCanvas" width="512" height="200"></canvas>
+
+        <div class="card-footer">
+            <div class="footer-answer">Answer: <strong id="answerDisplay">—</strong></div>
+            <div class="footer-reset" id="resetBtn">Reset</div>
+        </div>
+    </div>
+
+    <div class="survey-footer">
+        Your response is anonymous and will be used to improve our service.<br>
+        (Results may be ignored.)
+    </div>
+    <div class="powered">Powered by CustomerPulse™ · Response time: suspiciously long</div>
+</div>
+
+<script>
+const canvas    = document.getElementById('balanceCanvas');
+const ctx       = canvas.getContext('2d');
+const yesBtn    = document.getElementById('yesBtn');
+const noBtn     = document.getElementById('noBtn');
+const yesCntEl  = document.getElementById('yesCount');
+const noCntEl   = document.getElementById('noCount');
+const answerEl  = document.getElementById('answerDisplay');
+const resetBtnEl= document.getElementById('resetBtn');
+
+const CW = 512, CH = 200;
+
+// ── Scale geometry ────────────────────────────────────
+const PX = CW / 2;  // pivot X
+const PY = 62;      // pivot Y (top of stand arm)
+const BEAM_L   = 155; // half-length of beam
+const ROPE_L   = 70;  // rope length
+const PAN_W    = 70;
+const PAN_H    = 8;
+const STAND_H  = 110; // stand height below pivot
+
+// ── State ─────────────────────────────────────────────
+let yesWeights = 0, noWeights = 0;
+let beamAngle  = 0, beamTarget = 0;
+let fallingWeights = [];
+let decided = false, winner = null;
+
+// ── Weight visuals ────────────────────────────────────
+const WT_W = 14, WT_H = 11, WT_COLS = 4, MAX_VIS = 16;
+const YES_COLOR = '#6366f1';
+const NO_COLOR  = '#ef4444';
+
+// ── Beam math ─────────────────────────────────────────
+function beamEnds() {
+    // positive angle → YES (left) goes DOWN, NO (right) goes UP
+    const lx = PX - BEAM_L * Math.cos(beamAngle);
+    const ly = PY + BEAM_L * Math.sin(beamAngle);
+    const rx = PX + BEAM_L * Math.cos(beamAngle);
+    const ry = PY - BEAM_L * Math.sin(beamAngle);
+    return {
+        yes: { x: lx, y: ly, panY: ly + ROPE_L, cx: lx },
+        no:  { x: rx, y: ry, panY: ry + ROPE_L, cx: rx },
+    };
+}
+
+// ── Draw ─────────────────────────────────────────────
+function render() {
+    // Smooth beam
+    beamAngle += (beamTarget - beamAngle) * 0.07;
+
+    ctx.clearRect(0, 0, CW, CH);
+
+    // Background
+    ctx.fillStyle = '#f9fafb';
+    ctx.fillRect(0, 0, CW, CH);
+
+    const ends = beamEnds();
+
+    // Stand (vertical post)
+    ctx.strokeStyle = '#9ca3af';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(PX, PY);
+    ctx.lineTo(PX, PY + STAND_H);
+    ctx.stroke();
+
+    // Base
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(PX - 55, PY + STAND_H);
+    ctx.lineTo(PX + 55, PY + STAND_H);
+    ctx.stroke();
+
+    // Small base feet
+    ctx.lineWidth = 4;
+    [-45, 45].forEach(dx => {
+        ctx.beginPath();
+        ctx.moveTo(PX + dx, PY + STAND_H);
+        ctx.lineTo(PX + dx, PY + STAND_H + 6);
+        ctx.stroke();
+    });
+
+    // Pivot ring
+    ctx.fillStyle = '#6b7280';
+    ctx.beginPath();
+    ctx.arc(PX, PY, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#f9fafb';
+    ctx.beginPath();
+    ctx.arc(PX, PY, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Beam
+    ctx.strokeStyle = '#374151';
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(ends.yes.x, ends.yes.y);
+    ctx.lineTo(ends.no.x,  ends.no.y);
+    ctx.stroke();
+
+    // Ropes
+    ctx.strokeStyle = '#9ca3af';
+    ctx.lineWidth = 1.5;
+    ['yes','no'].forEach(side => {
+        const e = ends[side];
+        ctx.beginPath();
+        ctx.moveTo(e.x, e.y);
+        ctx.lineTo(e.cx - PAN_W/2, e.panY);
+        ctx.lineTo(e.cx + PAN_W/2, e.panY);
+        ctx.moveTo(e.x, e.y);
+        ctx.stroke();
+    });
+
+    // Pans + weights
+    drawPan(ends.yes, yesWeights, YES_COLOR, decided && winner === 'yes');
+    drawPan(ends.no,  noWeights,  NO_COLOR,  decided && winner === 'no');
+
+    // Falling weights
+    for (let i = fallingWeights.length - 1; i >= 0; i--) {
+        const w = fallingWeights[i];
+        w.vy += 0.55;
+        w.y  += w.vy;
+
+        // Track toward current pan center
+        const e = ends[w.side];
+        w.x += (e.cx - w.x) * 0.12;
+
+        // Landing check
+        const stackH = Math.min(Math.floor((w.side === 'yes' ? yesWeights : noWeights) / WT_COLS), Math.floor(MAX_VIS / WT_COLS)) * (WT_H + 2);
+        const landY  = e.panY - stackH - WT_H - 4;
+        if (w.y >= landY) {
+            fallingWeights.splice(i, 1);
+            continue;
+        }
+
+        const color = w.side === 'yes' ? YES_COLOR : NO_COLOR;
+        ctx.fillStyle = color;
+        ctx.globalAlpha = 0.85;
+        ctx.beginPath();
+        ctx.roundRect(w.x - WT_W/2, w.y - WT_H/2, WT_W, WT_H, 3);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+    }
+
+    // Winner label
+    if (decided) {
+        const e = ends[winner];
+        const label = winner === 'yes' ? '✓ YES' : '✓ NO';
+        const color = winner === 'yes' ? YES_COLOR : NO_COLOR;
+        ctx.fillStyle = color;
+        ctx.font = 'bold 15px system-ui';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(label, e.cx, e.panY - MAX_VIS/WT_COLS * (WT_H+2) - 12);
+    }
+
+    requestAnimationFrame(render);
+}
+
+function drawPan(e, count, color, winning) {
+    // Pan rectangle
+    ctx.fillStyle = winning ? color : '#d1d5db';
+    ctx.beginPath();
+    ctx.roundRect(e.cx - PAN_W/2, e.panY, PAN_W, PAN_H, 3);
+    ctx.fill();
+
+    // Stacked weights
+    const visCount = Math.min(count, MAX_VIS);
+    for (let i = 0; i < visCount; i++) {
+        const col = i % WT_COLS;
+        const row = Math.floor(i / WT_COLS);
+        const wx  = e.cx - PAN_W/2 + 3 + col * (WT_W + 2);
+        const wy  = e.panY - (row + 1) * (WT_H + 2);
+        ctx.fillStyle = color;
+        ctx.globalAlpha = winning ? 1 : 0.8;
+        ctx.beginPath();
+        ctx.roundRect(wx, wy, WT_W, WT_H, 3);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+    }
+
+    // Overflow indicator
+    if (count > MAX_VIS) {
+        ctx.fillStyle = color;
+        ctx.font = 'bold 15px system-ui';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        const topY = e.panY - Math.ceil(MAX_VIS / WT_COLS) * (WT_H + 2) - 4;
+        ctx.fillText(`+${count - MAX_VIS}`, e.cx, topY);
+    }
+}
+
+// ── Interaction ───────────────────────────────────────
+function addWeight(side) {
+    if (decided) return;
+
+    // Pulse animation on button
+    const btn = side === 'yes' ? yesBtn : noBtn;
+    btn.classList.remove('pulsing');
+    void btn.offsetWidth; // reflow
+    btn.classList.add('pulsing');
+
+    if (side === 'yes') yesWeights++;
+    else noWeights++;
+
+    // Spawn falling weight
+    const ends = beamEnds();
+    const e = ends[side];
+    fallingWeights.push({ side, x: e.cx, y: -18, vy: 1 });
+
+    // Update beam target
+    const diff = yesWeights - noWeights;
+    const maxAngle = Math.PI / 7; // ~26°
+    beamTarget = Math.max(-maxAngle, Math.min(maxAngle, diff * maxAngle / 12));
+
+    // Update count displays
+    yesCntEl.textContent = yesWeights + (yesWeights === 1 ? ' weight' : ' weights');
+    noCntEl.textContent  = noWeights  + (noWeights  === 1 ? ' weight' : ' weights');
+
+    // Win condition: diff ≥ 10 and total ≥ 15, or one side hits 20
+    const total = yesWeights + noWeights;
+    if ((Math.abs(diff) >= 10 && total >= 15) || yesWeights >= 20 || noWeights >= 20) {
+        decided = true;
+        winner  = diff >= 0 ? 'yes' : 'no';
+        beamTarget = winner === 'yes' ? Math.PI / 7 : -Math.PI / 7;
+        setDecided();
+    }
+
+    resetBtnEl.classList.add('active');
+}
+
+function setDecided() {
+    if (winner === 'yes') {
+        yesBtn.classList.add('winner-yes', 'disabled');
+        noBtn.classList.add('loser');
+        answerEl.textContent = 'Yes';
+        answerEl.style.color = YES_COLOR;
+    } else {
+        noBtn.classList.add('winner-no', 'disabled');
+        yesBtn.classList.add('loser');
+        answerEl.textContent = 'No';
+        answerEl.style.color = NO_COLOR;
+    }
+}
+
+resetBtnEl.addEventListener('click', () => {
+    if (!resetBtnEl.classList.contains('active')) return;
+    yesWeights = 0; noWeights = 0;
+    beamAngle = 0; beamTarget = 0;
+    fallingWeights = [];
+    decided = false; winner = null;
+    yesCntEl.textContent = '0 weights';
+    noCntEl.textContent  = '0 weights';
+    answerEl.textContent = '—';
+    answerEl.style.color = '';
+    yesBtn.classList.remove('winner-yes','loser','disabled','pulsing');
+    noBtn.classList.remove('winner-no','loser','disabled','pulsing');
+    resetBtnEl.classList.remove('active');
+});
+
+render();
+</script>
+
+</body>
+</html>

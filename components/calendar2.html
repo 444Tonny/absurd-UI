@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Clock — New Alarm</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #f2f2f7;
+            color: #1c1c1e;
+            font-family: system-ui, -apple-system, sans-serif;
+            font-size: 15px;
+            min-height: 100vh;
+        }
+
+        nav {
+            background: rgba(242,242,247,0.95);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid #c6c6c8;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 20px; height: 52px;
+            position: sticky; top: 0; z-index: 10;
+        }
+        .nav-cancel { color: #007aff; font-size: 17px; cursor: pointer; }
+        .nav-title  { font-size: 17px; font-weight: 600; }
+        .nav-save   { color: #007aff; font-size: 17px; font-weight: 600; cursor: pointer; }
+
+        .container { max-width: 600px; margin: 0 auto; padding: 24px 16px 48px; }
+
+        /* ── Main component card ── */
+        .picker-card {
+            background: #fff;
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+            margin-bottom: 28px;
+        }
+        .picker-title {
+            text-align: center;
+            font-size: 20px;
+            font-weight: 500;
+            padding: 18px 16px 14px;
+            color: #1c1c1e;
+        }
+        canvas {
+            display: block;
+            cursor: default;
+            user-select: none;
+        }
+        .picker-footer {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px 16px;
+            border-top: 1px solid #f2f2f7;
+        }
+        .picker-time { font-size: 15px; color: #6b6b6b; }
+        .picker-time strong { font-size: 20px; color: #1c1c1e; font-weight: 700; }
+        .picker-reset { font-size: 15px; color: #c6c6c8; cursor: default; transition: color 0.15s; }
+        .picker-reset.active { color: #007aff; cursor: pointer; }
+
+        /* ── Fake settings ── */
+        .section-label {
+            font-size: 13px; color: #6b6b6b;
+            text-transform: uppercase; letter-spacing: 0.4px;
+            padding: 0 4px 7px;
+        }
+        .settings-group {
+            background: #fff; border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+            margin-bottom: 24px;
+        }
+        .settings-row {
+            display: flex; align-items: center;
+            padding: 13px 16px;
+            border-bottom: 1px solid #f2f2f7;
+        }
+        .settings-row:last-child { border-bottom: none; }
+        .row-label  { flex: 1; font-size: 17px; color: #1c1c1e; }
+        .row-value  { font-size: 17px; color: #6b6b6b; margin-right: 6px; }
+        .row-detail { font-size: 13px; color: #6b6b6b; margin-top: 2px; }
+        .chevron { color: #c6c6c8; font-size: 17px; }
+        .toggle {
+            width: 51px; height: 31px; border-radius: 16px;
+            background: #34c759; position: relative; flex-shrink: 0; cursor: pointer;
+            transition: background 0.2s;
+        }
+        .toggle::after {
+            content: ''; position: absolute;
+            width: 27px; height: 27px; border-radius: 50%;
+            background: #fff; top: 2px; left: 22px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+            transition: left 0.2s;
+        }
+        .toggle.off { background: #e5e5ea; }
+        .toggle.off::after { left: 2px; }
+    </style>
+</head>
+<body>
+
+<nav>
+    <span class="nav-cancel">Cancel</span>
+    <span class="nav-title">ALARM</span>
+    <span class="nav-save">Save</span>
+</nav>
+
+<div class="container">
+
+    <div class="picker-card">
+        <canvas id="sky" width="568" height="230"></canvas>
+        <div class="picker-footer">
+            <div class="picker-time">Time: <strong id="timeDisplay">06:00</strong></div>
+            <div class="picker-reset" id="resetBtn">Reset</div>
+        </div>
+    </div>
+
+    <div class="section-label">Other alarms</div>
+    <div class="settings-group">
+        <div class="settings-row">
+            <div style="flex:1">
+                <div class="row-label">07:30</div>
+                <div class="row-detail">Weekdays</div>
+            </div>
+            <div class="toggle"></div>
+        </div>
+        <div class="settings-row">
+            <div style="flex:1">
+                <div class="row-label">09:00</div>
+                <div class="row-detail">Sat, Sun</div>
+            </div>
+            <div class="toggle off"></div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+const canvas      = document.getElementById('sky');
+const ctx         = canvas.getContext('2d');
+const timeDisplay = document.getElementById('timeDisplay');
+const resetBtn    = document.getElementById('resetBtn');
+
+const CW = 568, CH = 230;
+canvas.width  = CW;
+canvas.height = CH;
+
+// Arc geometry
+const cx = CW / 2;      // 284
+const cy = CH - 32;     // ground level (198)
+const Rx = 248;         // horizontal radius
+const Ry = 158;         // vertical radius
+
+// t ∈ [0,1]: 0 = midnight left, 0.5 = noon top, 1 = midnight right
+let t = 0.25;           // default 06:00
+let defaultT = 0.25;
+let hasInteracted = false;
+let dragging = false;
+
+// Pre-generate stars
+const STARS = Array.from({ length: 80 }, () => ({
+    x: Math.random() * CW,
+    y: Math.random() * (CH * 0.65),
+    r: 0.5 + Math.random() * 1.2,
+    twinkle: Math.random() * Math.PI * 2,
+}));
+
+// ── Arc math ─────────────────────────────────────────
+function arcPoint(val) {
+    const angle = Math.PI * (1 - val);
+    return {
+        x: cx + Rx * Math.cos(angle),
+        y: cy - Ry * Math.sin(angle),
+    };
+}
+
+function tFromMouse(mx, my) {
+    const dx = mx - cx;
+    const dy = cy - my;
+    const angle = Math.atan2(dy / Ry, dx / Rx);
+    const raw = (Math.PI - angle) / Math.PI;
+    return Math.max(0.001, Math.min(0.999, raw));
+}
+
+function tToHour(val) { return val * 24; }
+
+function formatTime(val) {
+    const total = tToHour(val);
+    const h = Math.floor(total) % 24;
+    const m = Math.floor((total - Math.floor(total)) * 60);
+    return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+}
+
+// ── Sky gradient key frames ───────────────────────────
+// Each entry: [h, topR,G,B, botR,G,B]
+const SKY_KEYS = [
+    { h: 0,  top: [8,10,42],    bot: [12,22,58]   }, // midnight
+    { h: 4,  top: [12,12,52],   bot: [18,18,78]   }, // deep night
+    { h: 5.5,top: [40,20,90],   bot: [80,40,120]  }, // pre-dawn
+    { h: 6.5,top: [220,100,40], bot: [255,170,60] }, // sunrise
+    { h: 8,  top: [60,140,220], bot: [140,195,255]}, // morning
+    { h: 12, top: [25,95,195],  bot: [80,160,235] }, // noon
+    { h: 16, top: [30,105,200], bot: [90,165,240] }, // afternoon
+    { h: 18, top: [210,85,30],  bot: [255,145,55] }, // sunset
+    { h: 19.5,top:[40,20,90],   bot: [60,25,110]  }, // dusk
+    { h: 22, top: [8,10,42],    bot: [12,22,58]   }, // night
+    { h: 24, top: [8,10,42],    bot: [12,22,58]   }, // midnight
+];
+
+function lerp3(a, b, f) {
+    return a.map((v, i) => Math.round(v + (b[i] - v) * f));
+}
+
+function getSkyColors(hour) {
+    for (let i = 0; i < SKY_KEYS.length - 1; i++) {
+        const a = SKY_KEYS[i], b = SKY_KEYS[i + 1];
+        if (hour >= a.h && hour <= b.h) {
+            const f = (hour - a.h) / (b.h - a.h);
+            return {
+                top: lerp3(a.top, b.top, f),
+                bot: lerp3(a.bot, b.bot, f),
+            };
+        }
+    }
+    return { top: SKY_KEYS[0].top, bot: SKY_KEYS[0].bot };
+}
+
+function rgb(c) { return `rgb(${c[0]},${c[1]},${c[2]})`; }
+
+// ── Darkness 0→1 (0 = bright noon, 1 = midnight) ─────
+function darkness(hour) {
+    if (hour >= 8 && hour <= 16) return 0;
+    if (hour < 5 || hour > 21)   return 1;
+    if (hour >= 5 && hour < 8)   return 1 - (hour - 5) / 3;
+    return (hour - 16) / 5;
+}
+
+// ── Draw ─────────────────────────────────────────────
+function render() {
+    const hour = tToHour(t);
+    const dark = darkness(hour);
+    const isSun = hour >= 5.8 && hour <= 18.2;
+    const body  = arcPoint(t);
+    const sky   = getSkyColors(hour);
+
+    // Sky gradient
+    const grd = ctx.createLinearGradient(0, 0, 0, cy);
+    grd.addColorStop(0, rgb(sky.top));
+    grd.addColorStop(1, rgb(sky.bot));
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, CW, cy);
+
+    // Ground
+    const grassDark  = lerp3([30,80,30],  [8,20,8],   dark);
+    const grassLight = lerp3([60,140,60], [12,35,12], dark);
+    const grdGrass   = ctx.createLinearGradient(0, cy, 0, CH);
+    grdGrass.addColorStop(0, rgb(grassDark));
+    grdGrass.addColorStop(1, rgb(grassLight));
+    ctx.fillStyle = grdGrass;
+    ctx.fillRect(0, cy, CW, CH - cy);
+
+    // Stars
+    if (dark > 0.05) {
+        const starAlpha = Math.min(1, dark * 1.4);
+        STARS.forEach(s => {
+            const twinkle = 0.6 + 0.4 * Math.sin(Date.now() / 800 + s.twinkle);
+            ctx.fillStyle = `rgba(255,255,240,${starAlpha * twinkle})`;
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+            ctx.fill();
+        });
+    }
+
+    // Horizon glow at dawn/dusk
+    if (dark > 0.1 && dark < 0.95) {
+        const glowAlpha = Math.min(dark, 1 - dark) * 2.5;
+        const glowColor = hour < 12 ? `rgba(255,140,40,${glowAlpha * 0.35})`
+                                    : `rgba(255,100,30,${glowAlpha * 0.35})`;
+        const hgrd = ctx.createRadialGradient(cx, cy, 0, cx, cy, CW * 0.7);
+        hgrd.addColorStop(0, glowColor);
+        hgrd.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = hgrd;
+        ctx.fillRect(0, 0, CW, CH);
+    }
+
+    // Sun
+    if (isSun) {
+        // Atmospheric glow
+        const sunGlow = ctx.createRadialGradient(body.x, body.y, 14, body.x, body.y, 72);
+        const glowA = 0.18 + (1 - dark) * 0.22;
+        sunGlow.addColorStop(0, `rgba(255,220,60,${glowA})`);
+        sunGlow.addColorStop(1, 'rgba(255,180,0,0)');
+        ctx.fillStyle = sunGlow;
+        ctx.beginPath();
+        ctx.arc(body.x, body.y, 72, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Sun disk
+        ctx.fillStyle = '#fdd835';
+        ctx.beginPath();
+        ctx.arc(body.x, body.y, 15, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#fff176';
+        ctx.beginPath();
+        ctx.arc(body.x, body.y, 9, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Moon
+    if (!isSun) {
+        // Moon glow
+        const mglow = ctx.createRadialGradient(body.x, body.y, 10, body.x, body.y, 55);
+        mglow.addColorStop(0, `rgba(200,220,255,${dark * 0.25})`);
+        mglow.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = mglow;
+        ctx.beginPath();
+        ctx.arc(body.x, body.y, 55, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Moon crescent
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(body.x, body.y, 13, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.fillStyle = '#fffde7';
+        ctx.beginPath();
+        ctx.arc(body.x, body.y, 13, 0, Math.PI * 2);
+        ctx.fill();
+        // Cut out
+        ctx.fillStyle = rgb(lerp3(sky.top, sky.bot, 0.3));
+        ctx.beginPath();
+        ctx.arc(body.x + 7, body.y - 3, 11, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    // House
+    drawHouse(dark, body, isSun);
+
+    // Drag hint
+    if (!hasInteracted) {
+        ctx.save();
+        ctx.font = '13px system-ui';
+        ctx.fillStyle = `rgba(255,255,255,${0.55 + dark * 0.3})`;
+        ctx.textAlign = 'center';
+        ctx.fillText('drag the ' + (isSun ? '☀' : '☾'), body.x, body.y - 26);
+        ctx.restore();
+    }
+}
+
+function drawHouse(dark, sunBody, isSun) {
+    // House dimensions
+    const hw  = 110, hh = 68;
+    const hx  = cx - hw / 2;
+    const hy  = cy - hh;             // top of walls
+
+    // Ambient light from sun (soft rectangle on ground in front of house)
+    if (!isSun ? false : dark < 0.3) {
+        const lightAlpha = (0.3 - dark) * 0.6;
+        const lx = hx - 20, lw = hw + 40;
+        const lGrd = ctx.createRadialGradient(cx, cy + 8, 0, cx, cy + 8, lw * 0.6);
+        lGrd.addColorStop(0, `rgba(255,230,150,${lightAlpha})`);
+        lGrd.addColorStop(1, 'rgba(255,200,80,0)');
+        ctx.fillStyle = lGrd;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy + 8, lw * 0.6, 14, 0, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Wall color: warm beige in day, dark silhouette at night
+    const wallR = Math.round(lerp3([50,40,35], [225,205,175], 1 - dark)[0]);
+    const wallG = Math.round(lerp3([50,40,35], [225,205,175], 1 - dark)[1]);
+    const wallB = Math.round(lerp3([50,40,35], [225,205,175], 1 - dark)[2]);
+    ctx.fillStyle = `rgb(${wallR},${wallG},${wallB})`;
+    ctx.fillRect(hx, hy, hw, hh);
+
+    // Roof
+    const roofBright = lerp3([28,20,18], [120,60,35], 1 - dark);
+    ctx.fillStyle = rgb(roofBright);
+    ctx.beginPath();
+    ctx.moveTo(hx - 12, hy);
+    ctx.lineTo(cx, hy - 52);
+    ctx.lineTo(hx + hw + 12, hy);
+    ctx.closePath();
+    ctx.fill();
+
+    // Chimney
+    const chimR = lerp3([22,16,14], [100,50,30], 1 - dark);
+    ctx.fillStyle = rgb(chimR);
+    ctx.fillRect(cx + 22, hy - 52, 14, 36);
+
+    // Door
+    const doorC = lerp3([20,15,12], [80,45,25], 1 - dark);
+    ctx.fillStyle = rgb(doorC);
+    ctx.beginPath();
+    ctx.roundRect(cx - 11, hy + hh - 32, 22, 32, [4, 4, 0, 0]);
+    ctx.fill();
+
+    // Door knob
+    ctx.fillStyle = dark > 0.5 ? '#ffe082' : '#c8a850';
+    ctx.beginPath();
+    ctx.arc(cx + 5, hy + hh - 16, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Windows
+    const WIN_DEFS = [
+        { x: hx + 12, y: hy + 14 },
+        { x: hx + hw - 34, y: hy + 14 },
+    ];
+    WIN_DEFS.forEach(w => {
+        if (dark > 0.25) {
+            // Night: glowing window
+            ctx.shadowBlur = 18;
+            ctx.shadowColor = 'rgba(255,220,100,0.7)';
+            ctx.fillStyle = '#ffe082';
+            ctx.fillRect(w.x, w.y, 22, 19);
+            ctx.shadowBlur = 0;
+            // Window frame
+            ctx.strokeStyle = 'rgba(180,130,30,0.5)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(w.x, w.y, 22, 19);
+            // Cross
+            ctx.beginPath();
+            ctx.moveTo(w.x + 11, w.y);
+            ctx.lineTo(w.x + 11, w.y + 19);
+            ctx.moveTo(w.x, w.y + 9);
+            ctx.lineTo(w.x + 22, w.y + 9);
+            ctx.stroke();
+        } else {
+            // Day: sky-reflecting window
+            const winC = lerp3([60,110,180], [100,155,210], dark);
+            ctx.fillStyle = rgb(winC);
+            ctx.fillRect(w.x, w.y, 22, 19);
+            ctx.strokeStyle = lerp3([35,25,20],[150,90,50], 1-dark).map(v=>v).join(',');
+            ctx.strokeStyle = `rgb(${lerp3([35,25,20],[150,90,50],1-dark).join(',')})`;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(w.x, w.y, 22, 19);
+            ctx.beginPath();
+            ctx.moveTo(w.x + 11, w.y);
+            ctx.lineTo(w.x + 11, w.y + 19);
+            ctx.moveTo(w.x, w.y + 9);
+            ctx.lineTo(w.x + 22, w.y + 9);
+            ctx.stroke();
+        }
+    });
+
+    // Walkway
+    const pathC = lerp3([22,18,14], [190,175,155], 1 - dark);
+    ctx.fillStyle = rgb(pathC);
+    ctx.beginPath();
+    ctx.moveTo(cx - 9, cy);
+    ctx.lineTo(cx + 9, cy);
+    ctx.lineTo(cx + 20, cy + (CH - cy));
+    ctx.lineTo(cx - 20, cy + (CH - cy));
+    ctx.closePath();
+    ctx.fill();
+
+    // Bushes
+    [[hx - 2, cy - 14], [hx + hw - 8, cy - 14]].forEach(([bx, by]) => {
+        const bushC = lerp3([18,35,14], [55,110,45], 1 - dark);
+        ctx.fillStyle = rgb(bushC);
+        ctx.beginPath();
+        ctx.arc(bx,     by,     11, 0, Math.PI * 2);
+        ctx.arc(bx + 13, by - 3, 9,  0, Math.PI * 2);
+        ctx.fill();
+    });
+}
+
+// ── Animation loop (for stars twinkling) ─────────────
+let raf;
+function tick() {
+    render();
+    raf = requestAnimationFrame(tick);
+}
+tick();
+
+// ── Interaction ───────────────────────────────────────
+function getCanvasPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const src  = e.touches ? e.touches[0] : e;
+    return {
+        x: (src.clientX - rect.left) * (CW / rect.width),
+        y: (src.clientY - rect.top)  * (CH / rect.height),
+    };
+}
+
+function isNearBody(pos) {
+    const b = arcPoint(t);
+    return Math.hypot(pos.x - b.x, pos.y - b.y) < 24;
+}
+
+canvas.addEventListener('mousedown', e => {
+    e.preventDefault();
+    const pos = getCanvasPos(e);
+    if (isNearBody(pos)) { dragging = true; canvas.style.cursor = 'grabbing'; }
+});
+canvas.addEventListener('touchstart', e => {
+    const pos = getCanvasPos(e);
+    if (isNearBody(pos)) { dragging = true; e.preventDefault(); }
+}, { passive: false });
+
+document.addEventListener('mousemove', e => {
+    if (!dragging) {
+        const pos = getCanvasPos(e);
+        canvas.style.cursor = isNearBody(pos) ? 'grab' : 'default';
+        return;
+    }
+    const pos = getCanvasPos(e);
+    t = tFromMouse(pos.x, pos.y);
+    hasInteracted = true;
+    updateDisplay();
+});
+document.addEventListener('touchmove', e => {
+    if (!dragging) return;
+    e.preventDefault();
+    const pos = getCanvasPos(e);
+    t = tFromMouse(pos.x, pos.y);
+    hasInteracted = true;
+    updateDisplay();
+}, { passive: false });
+
+document.addEventListener('mouseup',  () => { dragging = false; canvas.style.cursor = 'default'; });
+document.addEventListener('touchend', () => { dragging = false; });
+
+resetBtn.addEventListener('click', () => {
+    if (!resetBtn.classList.contains('active')) return;
+    t = defaultT;
+    hasInteracted = false;
+    updateDisplay();
+});
+
+function updateDisplay() {
+    timeDisplay.textContent = formatTime(t);
+    resetBtn.classList.toggle('active', hasInteracted);
+}
+
+updateDisplay();
+</script>
+
+</body>
+</html>
