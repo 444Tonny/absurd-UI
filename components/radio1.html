@@ -82,6 +82,24 @@
         .choice-btn.loser { opacity: 0.35; pointer-events: none; }
         .choice-btn.disabled { pointer-events: none; }
 
+        /* ── Radio indicator ── */
+        .radio-ring {
+            position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+            width: 20px; height: 20px; border-radius: 50%;
+            border: 2px solid #e5e7eb;
+            display: flex; align-items: center; justify-content: center;
+            transition: border-color 0.15s;
+            pointer-events: none;
+        }
+        .yes-btn .radio-ring { border-color: #3c3d40; }
+        .no-btn  .radio-ring { border-color: #3c3d40; }
+        .radio-dot {
+            width: 10px; height: 10px; border-radius: 50%;
+            opacity: 0; transition: opacity 0.1s;
+        }
+        .yes-btn .radio-dot { background: #3c3d40; }
+        .no-btn  .radio-dot { background: #3c3d40; }
+
         /* Click pulse */
         .choice-btn::after {
             content: '';
@@ -109,16 +127,19 @@
         }
         .footer-answer { font-size: 15px; color: #6b7280; }
         .footer-answer strong { font-size: 17px; color: #111827; font-weight: 700; }
-        .footer-reset {
-            font-size: 15px; color: #d1d5db; cursor: default; transition: color 0.15s;
+        .next-btn {
+            font-size: 15px; font-weight: 600; color: #fff;
+            background: #6366f1; border: none; border-radius: 8px;
+            padding: 8px 20px; cursor: pointer;
+            transition: background 0.15s, opacity 0.15s;
         }
-        .footer-reset.active { color: #9ca3af; cursor: pointer; }
-        .footer-reset.active:hover { color: #374151; }
+        .next-btn:hover { background: #4f46e5; }
+        .next-btn:disabled { background: #c7d2fe; cursor: default; }
 
         /* ── Fake footer stuff ── */
         .survey-footer {
             text-align: center; margin-top: 28px;
-            font-size: 15px; color: #9ca3af;
+            font-size: 15px; color: #3c3c3c;
         }
         .powered { margin-top: 8px; font-size: 13px; color: #d1d5db; }
     </style>
@@ -137,32 +158,30 @@
 
     <div class="survey-card">
         <div class="card-question">Would you recommend us to a friend?</div>
-        <div class="card-hint">Weigh your answer carefully. Very carefully.</div>
+        <div class="card-hint">Weigh your answer carefully</div>
 
         <div class="choices">
             <button class="choice-btn yes-btn" id="yesBtn" onclick="addWeight('yes')">
+                <span class="radio-ring"><span class="radio-dot" id="yesDot"></span></span>
                 <span class="choice-label">YES</span>
-                <span class="choice-count" id="yesCount">0 weights</span>
             </button>
             <button class="choice-btn no-btn" id="noBtn" onclick="addWeight('no')">
+                <span class="radio-ring"><span class="radio-dot" id="noDot"></span></span>
                 <span class="choice-label">NO</span>
-                <span class="choice-count" id="noCount">0 weights</span>
             </button>
         </div>
 
-        <canvas id="balanceCanvas" width="512" height="200"></canvas>
+        <canvas id="balanceCanvas" width="512" height="230"></canvas>
 
         <div class="card-footer">
-            <div class="footer-answer">Answer: <strong id="answerDisplay">—</strong></div>
-            <div class="footer-reset" id="resetBtn">Reset</div>
+            <div class="footer-answer">FINAL ANSWER : <strong id="answerDisplay">—</strong></div>
+            <button class="next-btn" id="skipBtn" disabled>Next</button>
         </div>
     </div>
 
     <div class="survey-footer">
-        Your response is anonymous and will be used to improve our service.<br>
-        (Results may be ignored.)
+        Your response is anonymous (Results may be ignored.)
     </div>
-    <div class="powered">Powered by CustomerPulse™ · Response time: suspiciously long</div>
 </div>
 
 <script>
@@ -173,7 +192,9 @@ const noBtn     = document.getElementById('noBtn');
 const yesCntEl  = document.getElementById('yesCount');
 const noCntEl   = document.getElementById('noCount');
 const answerEl  = document.getElementById('answerDisplay');
-const resetBtnEl= document.getElementById('resetBtn');
+const skipBtnEl = document.getElementById('skipBtn');
+const yesDotEl  = document.getElementById('yesDot');
+const noDotEl   = document.getElementById('noDot');
 
 const CW = 512, CH = 200;
 
@@ -274,9 +295,9 @@ function render() {
         const e = ends[side];
         ctx.beginPath();
         ctx.moveTo(e.x, e.y);
-        ctx.lineTo(e.cx - PAN_W/2, e.panY);
-        ctx.lineTo(e.cx + PAN_W/2, e.panY);
+        ctx.lineTo(e.cx - PAN_W/2, e.panY); // left string
         ctx.moveTo(e.x, e.y);
+        ctx.lineTo(e.cx + PAN_W/2, e.panY); // right string
         ctx.stroke();
     });
 
@@ -383,19 +404,22 @@ function addWeight(side) {
     beamTarget = Math.max(-maxAngle, Math.min(maxAngle, diff * maxAngle / 12));
 
     // Update count displays
-    yesCntEl.textContent = yesWeights + (yesWeights === 1 ? ' weight' : ' weights');
-    noCntEl.textContent  = noWeights  + (noWeights  === 1 ? ' weight' : ' weights');
+    //yesCntEl.textContent = yesWeights
+    //noCntEl.textContent  = noWeights;
+
+    // Update radio dot opacity (0 weights = 0, 20 weights = 1)
+    yesDotEl.style.opacity = Math.min(yesWeights / 30, 1);
+    noDotEl.style.opacity  = Math.min(noWeights  / 30, 1);
 
     // Win condition: diff ≥ 10 and total ≥ 15, or one side hits 20
     const total = yesWeights + noWeights;
-    if ((Math.abs(diff) >= 10 && total >= 15) || yesWeights >= 20 || noWeights >= 20) {
+    if ((Math.abs(diff) >= 10 && total >= 30) || yesWeights >= 30 || noWeights >= 30) {
         decided = true;
         winner  = diff >= 0 ? 'yes' : 'no';
         beamTarget = winner === 'yes' ? Math.PI / 7 : -Math.PI / 7;
         setDecided();
     }
 
-    resetBtnEl.classList.add('active');
 }
 
 function setDecided() {
@@ -410,22 +434,8 @@ function setDecided() {
         answerEl.textContent = 'No';
         answerEl.style.color = NO_COLOR;
     }
+    skipBtnEl.disabled = false;
 }
-
-resetBtnEl.addEventListener('click', () => {
-    if (!resetBtnEl.classList.contains('active')) return;
-    yesWeights = 0; noWeights = 0;
-    beamAngle = 0; beamTarget = 0;
-    fallingWeights = [];
-    decided = false; winner = null;
-    yesCntEl.textContent = '0 weights';
-    noCntEl.textContent  = '0 weights';
-    answerEl.textContent = '—';
-    answerEl.style.color = '';
-    yesBtn.classList.remove('winner-yes','loser','disabled','pulsing');
-    noBtn.classList.remove('winner-no','loser','disabled','pulsing');
-    resetBtnEl.classList.remove('active');
-});
 
 render();
 </script>
